@@ -1,0 +1,24 @@
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+### Gradle (Spring Boot 빌드 관련) ###
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### Python & FastAPI ###
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+.env
+
+### OS 파일 ###
+.DS_Store
+Thumbs.db
