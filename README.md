@@ -5,13 +5,13 @@
 
 ---
 
-## 🛠️ Tech Stack & Architecture
+## Tech Stack & Architecture
 - **Backend (Main):** Java 17 / Spring Boot 3.5.16 / Spring Data JPA
 - **AI / LLM:** Python 3.10+ / FastAPI / LangChain / OpenAI API
 - **Database:** TBD (Core) / Chroma (Vector DB)
 
 ---
 
-## 🌟 핵심 기능 (MVP Scope)
+## 핵심 기능 (MVP Scope)
 1. **자연어 기반 일정 파싱 (AI):** 메모장에 자유롭게 적은 글을 분석하여 데드라인과 태스크 자동 등록
 2. **퀘스트 & 캐릭터 성장 시스템:** 할 일 완료 시 캐릭터 경험치 획득 및 상태 변화
