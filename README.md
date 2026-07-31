@@ -50,3 +50,8 @@
 - **개방-폐쇄 원칙(OCP) 적용:**
   - `Character`와 `User`를 1:1로 매핑하되, `CharacterType`과 진화 단계 스펙을 별도 도메인으로 분리.
   - 추후 신규 펫 캐릭터 추가 시 기존 비즈니스 로직 수정 없이 데이터/Enum 확장만으로 대응 가능하도록 설계.
+
+
+## 엔티티 분석 다이어그램
+
+![Entity Analysis Diagram](docs/images/entity-diagram.png)
