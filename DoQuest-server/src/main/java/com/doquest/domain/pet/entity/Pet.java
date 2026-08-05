@@ -57,18 +57,22 @@ public class Pet extends BaseTimeEntity {
         }
     }
 
+    // Pet.java 내부 메서드 수정
     private void updateStage() {
-        if(this.stage == PetStage.EGG && this.exp >= PetStage.BABY.getRequiredExp()) {
-            this.stage = PetStage.BABY;
-            this.level++;
-        }
-        else if (this.stage == PetStage.BABY && this.exp >= PetStage.JUNIOR.getRequiredExp()) {
-            this.stage = PetStage.JUNIOR;
-            this.level++;
-        }
-        else if (this.stage == PetStage.JUNIOR && this.exp >= PetStage.SENIOR.getRequiredExp()) {
-            this.stage = PetStage.SENIOR;
-            this.level++;
+        // 현재 단계에서 다음 단계로 올라갈 조건이 만족되는 동안 반복
+        while (true) {
+            if (this.stage == PetStage.EGG && this.exp >= PetStage.BABY.getRequiredExp()) {
+                this.stage = PetStage.BABY;
+                this.level++;
+            } else if (this.stage == PetStage.BABY && this.exp >= PetStage.JUNIOR.getRequiredExp()) {
+                this.stage = PetStage.JUNIOR;
+                this.level++;
+            } else if (this.stage == PetStage.JUNIOR && this.exp >= PetStage.SENIOR.getRequiredExp()) {
+                this.stage = PetStage.SENIOR;
+                this.level++;
+            } else {
+                break; // 더 이상 레벨업할 조건이 안 되면 탈출
+            }
         }
     }
 }
