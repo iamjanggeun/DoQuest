@@ -45,5 +45,4 @@ class MemoTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("수정할 메모 내용은 공백일 수 없습니다.");
     }
-
 }
