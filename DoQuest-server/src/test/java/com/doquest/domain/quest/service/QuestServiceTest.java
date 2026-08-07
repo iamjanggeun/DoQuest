@@ -89,12 +89,11 @@ class QuestServiceTest {
     void 미완료_퀘스트_목록_확인_테스트() {
         // given
         Long memberId = 1L;
-        // 💡 픽스처(Fixture) 생성
+
         Member member = Member.createMember("test@email.com", "pass", "닉네임", null);
         Quest uncompletedQuest1 = Quest.createQuest(member, "JPA 복습", QuestCategory.STUDY, 50);
         Quest uncompletedQuest2 = Quest.createQuest(member, "알고리즘 풀기", QuestCategory.STUDY, 50);
 
-        // 💡 Mock 객체의 행위 정의
         given(memberRepository.existsById(memberId)).willReturn(true);
         given(questRepository.findByMemberIdAndIsCompletedFalse(memberId))
                 .willReturn(List.of(uncompletedQuest1, uncompletedQuest2));
@@ -106,7 +105,7 @@ class QuestServiceTest {
         assertThat(result).hasSize(2);
         assertThat(result).containsExactly(uncompletedQuest1, uncompletedQuest2);
 
-        // 💡 비즈니스 로직에 맞게 정확한 Repository 메서드를 호출했는지 '행위 검증(Verification)'
+        // 비즈니스 로직에 맞게 정확한 Repository 메서드를 호출했는지 행위 검증
         verify(memberRepository).existsById(memberId);
         verify(questRepository).findByMemberIdAndIsCompletedFalse(memberId);
     }
