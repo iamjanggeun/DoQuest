@@ -7,6 +7,11 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import static jakarta.persistence.CascadeType.PERSIST;
+import static jakarta.persistence.FetchType.LAZY;
+import static jakarta.persistence.GenerationType.IDENTITY;
+import static lombok.AccessLevel.PROTECTED;
+
 @Entity
 @Table(
         name = "members",
@@ -14,13 +19,12 @@ import lombok.NoArgsConstructor;
                 @Index(name = "idx_member_email", columnList = "email", unique = true)
         }
 )
-
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED) // 기본 생성자 접근 제어
+@NoArgsConstructor(access = PROTECTED) // 기본 생성자 접근 제어
 public class Member extends BaseTimeEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = IDENTITY)
     @Column(name = "member_id")
     private Long id;
 
@@ -37,7 +41,7 @@ public class Member extends BaseTimeEntity {
     private Role role;
 
     // Member가 연관관계의 주인 (pet_id FK 보유)
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.PERSIST)
+    @OneToOne(fetch = LAZY, cascade = PERSIST)
     @JoinColumn(name = "pet_id", foreignKey = @ForeignKey(name = "fk_members_to_pets"))
     private Pet pet;
 

@@ -1,10 +1,10 @@
-package com.doquest.domain.dashboard.dto;
+package com.doquest.domain.quest.dto;
 
 import com.doquest.domain.quest.entity.QuestCategory;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public record QuestCategoryRequest(
+public record QuestCreateRequest(
 
         @NotBlank(message = "퀘스트 제목은 필수입니다.")
         String title,

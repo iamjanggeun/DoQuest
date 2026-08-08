@@ -34,7 +34,7 @@ class PetTest {
         // then
         assertThat(pet.getExp()).isEqualTo(100);
         assertThat(pet.getLevel()).isEqualTo(2);
-        assertThat(pet.getStage()).isEqualTo(PetStage.BABY);
+        assertThat(pet.getStage()).isEqualTo(PetStage.CRACKED);
     }
 
     @Test
@@ -49,6 +49,6 @@ class PetTest {
         // then
         assertThat(pet.getExp()).isEqualTo(1000);
         assertThat(pet.getLevel()).isEqualTo(4); // EGG -> BABY(2) -> JUNIOR(3) -> SENIOR(4)
-        assertThat(pet.getStage()).isEqualTo(PetStage.SENIOR);
+        assertThat(pet.getStage()).isEqualTo(PetStage.BABY);
     }
 }

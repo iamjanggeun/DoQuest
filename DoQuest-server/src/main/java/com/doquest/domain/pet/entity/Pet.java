@@ -2,20 +2,20 @@ package com.doquest.domain.pet.entity;
 
 import com.doquest.global.common.BaseTimeEntity;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import static com.doquest.domain.pet.entity.PetStage.JUNIOR;
+import static jakarta.persistence.GenerationType.IDENTITY;
+import static lombok.AccessLevel.PROTECTED;
 
 @Entity
 @Table(name = "pets")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor(access = PROTECTED)
 public class Pet extends BaseTimeEntity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = IDENTITY)
     @Column(name = "pet_id")
     private Long id;
 
@@ -61,17 +61,17 @@ public class Pet extends BaseTimeEntity {
     private void updateStage() {
         // 현재 단계에서 다음 단계로 올라갈 조건이 만족되는 동안 반복
         while (true) {
-            if (this.stage == PetStage.EGG && this.exp >= PetStage.BABY.getRequiredExp()) {
+            if (this.stage == PetStage.EGG && this.exp >= PetStage.CRACKED.getRequiredExp()) {
+                this.stage = PetStage.CRACKED;
+                this.level++;
+            } else if (this.stage == PetStage.CRACKED && this.exp >= PetStage.HATCHED.getRequiredExp()) {
+                this.stage = PetStage.HATCHED;
+                this.level++;
+            } else if (this.stage == PetStage.HATCHED && this.exp >= PetStage.BABY.getRequiredExp()) {
                 this.stage = PetStage.BABY;
                 this.level++;
-            } else if (this.stage == PetStage.BABY && this.exp >= PetStage.JUNIOR.getRequiredExp()) {
-                this.stage = PetStage.JUNIOR;
-                this.level++;
-            } else if (this.stage == PetStage.JUNIOR && this.exp >= PetStage.SENIOR.getRequiredExp()) {
-                this.stage = PetStage.SENIOR;
-                this.level++;
             } else {
-                break; // 더 이상 레벨업할 조건이 안 되면 탈출
+                break;
             }
         }
     }

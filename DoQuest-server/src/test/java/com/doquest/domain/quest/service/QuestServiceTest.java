@@ -1,9 +1,7 @@
 package com.doquest.domain.quest.service;
 
 import com.doquest.domain.member.entity.Member;
-import com.doquest.domain.member.entity.Role;
 import com.doquest.domain.member.repository.MemberRepository;
-import com.doquest.domain.pet.entity.Pet;
 import com.doquest.domain.pet.repository.PetRepository;
 import com.doquest.domain.quest.entity.Quest;
 import com.doquest.domain.quest.entity.QuestCategory;
@@ -16,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -53,7 +50,7 @@ class QuestServiceTest {
         given(memberRepository.findById(1L)).willReturn(Optional.of(member));
         given(questRepository.save(any(Quest.class))).willReturn(quest);
         // when
-        Long savedId = questService.createQuest(1L, "알고리즘 1문제 풀기", QuestCategory.STUDY, 50);
+        Long savedId = questService.createQuest(1L, "알고리즘 1문제 풀기", QuestCategory.STUDY);
 
         // then
         assertThat(quest.getTitle()).isEqualTo("알고리즘 1문제 풀기");

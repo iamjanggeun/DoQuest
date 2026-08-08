@@ -53,7 +53,7 @@ public class Quest extends BaseTimeEntity {
 
     // == 비즈니스 로직 == //
     /**
-     * 퀘스트 완료 처리
+     * 퀘스트 완료 처리 및 중복 퀘스트 등록
      */
     public void complete() {
         if (this.isCompleted) {
@@ -61,4 +61,6 @@ public class Quest extends BaseTimeEntity {
         }
         this.isCompleted = true;
     }
+
+    //추후 duplicated 기능 QuestService에 구현해야함.
 }
