@@ -8,9 +8,9 @@ import lombok.RequiredArgsConstructor;
 public enum PetStage {
 
     EGG("알", 0),
-    BABY("아기", 100),
-    JUNIOR("자라나는 중", 500),
-    SENIOR("성체", 1000);
+    CRACKED("금간 알", 100),
+    HATCHED("부화함", 500),
+    BABY("아기", 1000);
 
     private final String description;
     private final int requiredExp;
