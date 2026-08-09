@@ -19,7 +19,10 @@ public enum ErrorCode {
     //Quest
     QUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "Q001", "존재하지 않는 퀘스트입니다."),
     QUEST_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "Q002", "이미 완료된 퀘스트입니다."),
-    DUPLICATE_QUEST_EXISTS(HttpStatus.CONFLICT, "Q003", "유사한 퀘스트가 이미 존재합니다.");
+    DUPLICATE_QUEST_EXISTS(HttpStatus.CONFLICT, "Q003", "유사한 퀘스트가 이미 존재합니다."),
+
+    // Pet
+    PET_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "해당 회원의 펫을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String code;
