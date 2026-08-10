@@ -42,6 +42,8 @@ class QuestServiceTest {
     @Mock
     private PetRepository petRepository;
 
+    // 26.08.10 퀘스트 어뷰징 코드 추가하면서 퀘스트 엔티티 전면 개편
+    // 새로운 테스트 코드
     @Test
     @DisplayName("정상적인 회원 ID와 입력값으로 퀘스트를 생성하면 퀘스트 ID가 반환된다.")
     void createQuest성공() {
