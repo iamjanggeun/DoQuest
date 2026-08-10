@@ -1,57 +1,81 @@
-# DoQuest (두퀘스트)
+# Revision History
 
-> **"취준생을 위한 AI 기반 할 일 RPG 서비스"**
-> 대충 적은 일정 메모에서 AI가 마감일과 핵심 맥락을 자동으로 추출하고, 할 일을 완료할 때마다 내 도트 캐릭터가 성장하는 게이미피케이션(Gamification) To-Do 웹 애플리케이션입니다.
-> 추후 취준생 뿐만이 아닌 학생, 수험생, 직장인 모두가 사용할 수 있도록 확장할 예정입니다.
----
-
-## Tech Stack & Architecture
-- **Backend (Main):** Java 17 / Spring Boot 3.5.16 / Spring Data JPA
-- **AI / LLM:** Python 3.10+ / FastAPI / LangChain / OpenAI API
-- **Database:** TBD (Core) / Chroma (Vector DB)
+| 개정일자 | 버전 | 주요 변경 및 반영 내용 | 작성자 |
+| :--- | :--- | :--- | :--- |
+| 2026.08.08 | v0.1.0 | Initial Project Setup & Domain Entity Design (Member, Pet, Quest) | Developer |
+| 2026.08.09 | v0.2.0 | Dashboard Aggregator API (`DashboardController`, `DashboardResponse`) 설계 | Developer |
+| 2026.08.10 | v0.3.0 | 펫 경험치 어뷰징 방지 가드레일(`QuestStatus`, `startedAt` 30분 타이머) 구축 및 단방향 1:1 영속성 전이 최적화 | Developer |
 
 ---
 
-## 핵심 기능 (MVP Scope)
-1. **자연어 기반 일정 파싱 (AI):** 메모장에 자유롭게 적은 글을 분석하여 데드라인과 태스크 자동 등록
-2. **퀘스트 & 캐릭터 성장 시스템:** 할 일 완료 시 캐릭터 경험치 획득 및 상태 변화
+# DoQuest (AI 기반 생산성 & 게이미피케이션 습관 형성 서비스)
 
+> **"오늘의 메모가 내일의 퀘스트가 되는 개인화 생산성 플랫폼"**  
+> DoQuest는 단순한 To-Do 리스트를 넘어, 메모 작성만으로 AI가 일정을 자동 추출하고 게이미피케이션(펫 성장) 요소를 결합하여 사용자의 지속적인 동기부여를 이끌어내는 백엔드 서비스입니다.
 
-# DoQuest : AI & Gamification 기반 일정 관리 시스템
+---
 
-## 1. 게이미피게이션 시스템 (Gamification Engine)
-- **메커니즘:** '다마고치/썸원' 방식의 펫 육성 인터페이스 도입.
-- **보상 루프 (Reward Loop):**
-  - **Quest Completion:** 할 일 완료 시 '먹이(재화)' 및 경험치(EXP) 획득.
-  - **Pet Interaction:** 먹이 주기를 통해 펫의 성장 레벨업 및 허기 상태 관리.
-- **성장 공식 (Growth Algorithm):**
-  - $\text{Next Level EXP} = \text{Current Level} \times 100$
-  - 레벨 구간별 펫 진화 상태(`EGG` ➔ `HATCHED` ➔ `EVOLVED`) 전이 로직 적용.
+## Tech Stack
 
-## 2. 어뷰징 방지 및 검증 로직 (Abuse Prevention)
-- **최소 수행 시간 검증 (Minimum Duration Validation):**
-  - 퀘스트 생성 시간(`created_at`)과 완료 요청 시간(`completed_at`)의 차이를 검증.
-  - 임계값(예: 퀘스트 등록 후 최소 5분) 미만 완료 시 `AbuseException` 예외 발생 및 경고 문구 출력.
-  - **목적:** 무분별한 완료 버튼 연타를 통한 빠른 성장 편법 방지 및 데이터 무결성 확보.
+- **Backend:** Java 17, Spring Boot 3.x, Spring Data JPA
+- **Database:** MySQL 8.0, Redis (예정)
+- **AI Engine (Phase 4 예정):** Python, FastAPI, LangChain, Vector DB (Chroma/pgvector)
+- **Testing & Tools:** JUnit5, AssertJ, Mockito, Postman, Git/GitHub
 
-## 3. 사용자 인터페이스 아키텍처 (UI/UX Architecture)
-- **단일 통합 대시보드 (Single Integrated Dashboard):**
-  - 화면 전환 비용을 줄이기 위해 **[펫 육성 / 캘린더 / 퀵 메모]**를 단일 화면에 모듈형 뷰로 배치.
-  - 퀘스트 완료 이벤트 발생 시 WebSocket/SSE 또는 상태 변경을 통해 펫 애니메이션 즉시 동기화.
+---
 
-## 4. AI & RAG 파이프라인 (LangChain & Vector DB Integration)
-- **자연어 파싱 (Structured Parsing):**
-  - 자유 형식 메모 입력 시 LangChain `Structured Output`을 통해 [일정명, 마감일, 상세설명] JSON 추출.
-- **비동기 정보 증강 (Asynchronous RAG):**
-  - 일정 추출 후, 해당 키워드 기반 관련 정보/참고 링크를 Vector DB 및 외부 Search API로 조회.
-  - 사용자 응답 속도 최적화를 위해 **일정 생성(동기)**과 **정보 증강(비동기)** 파이프라인을 분리 설계.
+## Architecture & Core Design Principles
 
-## 5. 캐릭터 확장성을 고려한 도메인 설계 (Extensible Domain Design)
-- **개방-폐쇄 원칙(OCP) 적용:**
-  - `Character`와 `User`를 1:1로 매핑하되, `CharacterType`과 진화 단계 스펙을 별도 도메인으로 분리.
-  - 추후 신규 펫 캐릭터 추가 시 기존 비즈니스 로직 수정 없이 데이터/Enum 확장만으로 대응 가능하도록 설계.
+### 1. BFF (Backend For Frontend) / Aggregator Pattern
+- **네트워크 Latency 및 Round-Trip 최적화:** 1번 대시보드 화면 진입 시, 펫 정보(`Pet`)와 미완료 퀘스트 목록(`Quest`)을 각각 분리된 API로 요청하지 않고 `DashboardController`에서 통합 조회하여 하나의 `DashboardResponse` DTO로 묶어 제공합니다.
 
+### 2. 도메인 주도 설계 (DDD) & 계층 간 책임 분리
+- **신뢰 경계 (Trust Boundary) 구축:** 퀘스트 생성 시 보상 경험치(`rewardExp`)를 클라이언트 요청(Request DTO)으로 받지 않고, 오직 서버 비즈니스 레이어(`QuestService`)에서 상수로 관리 및 주입하여 데이터 위변조(어뷰징)를 원천 차단했습니다.
+- **Single Source of Truth:** `boolean isCompleted` 플래그 대신 `QuestStatus` Enum (`IN_PROGRESS`, `COMPLETED`)으로 상태 관리를 일원화하여 데이터 불일치를 방지했습니다.
 
-## 엔티티 분석 다이어그램
+---
 
-![Entity Analysis Diagram](docs/images/entity-diagram.png)
+## Key Abusing Guardrails (어뷰징 방지 가드레일)
+
+### 30분 최소 수행 시간 타임스탬프 가드레일 (Rate Limiting)
+* **문제 정의:** 유저가 펫 경험치를 빠르게 올리기 위해 퀘스트 생성 직후 1초 만에 완료 버튼을 연속 연타하는 경험치 어뷰징 위험성 존재.
+* **시행착오 & UX 개선:** 
+  - *초기 안:* 퀘스트 생성 자체에 1분 쿨타임을 두려 했으나, 당일 할 일을 한꺼번에 등록하는 실제 사용자의 UX를 심각하게 저해함을 인지.
+  - *개선 안:* **등록과 수행 이벤트의 분리.** 퀘스트 생성 시점(`startedAt = LocalDateTime.now()`)을 기록하고, **완료 처리 시 `startedAt` 기준 최소 30분이 지난 경우에만 완료 승인 및 경험치를 지급**하도록 도메인 가드레일(`validateCompleteCooldown`) 구축.
+
+---
+
+## Performance Optimization & Indexing
+
+### 1. 복합 인덱스 (`Composite Index`) 적용
+- **조회 패턴:** 대시보드 진입 시 `WHERE member_id = ? AND status = 'IN_PROGRESS'` 조건의 조회가 빈번히 발생함.
+- **최적화:** `@Index(name = "idx_quests_member_status", columnList = "member_id, status")` 복합 인덱스를 생성하여 테이블 풀 스캔(Full Scan)을 방지하고 B-Tree 인덱스 스캔 효율 극대화.
+
+### 2. 읽기 전용 트랜잭션 최적화
+- `PetService`, `QuestService` 내 단건/목록 조회 메서드에 `@Transactional(readOnly = true)`를 선언하여 영속성 컨텍스트의 스냅샷 보관 비용 및 플러시(Flush) 오버헤드를 제거하여 CUD 대비 조회 성능 향상.
+
+---
+
+## Testing Strategy
+
+- **Domain Unit Test (`QuestTest`, `PetTest`):** Mocking 없이 팩토리 메서드 및 상태 변이 비즈니스 로직의 순수 자바 단위 검증.
+- **Service Layer Test (`QuestServiceTest`, `PetServiceTest`):** Mockito 기반의 계층 격리 테스트.
+  - `ReflectionTestUtils`를 활용해 H2/DB 인프라 연결 없이 `startedAt` 시각을 35분 전으로 가상 조작하여 30분 쿨타임 가드레일의 경계값(Edge Case) 및 타인 퀘스트 완료 시도(보안 예외)를 1초 미만의 속도로 고속 검증.
+
+---
+
+## Troubleshooting & Engineering Decisions
+
+<details>
+<summary><b>1. Member와 Pet 간의 1:1 단방향 매핑 및 순환 참조(닭과 달걀) 해결</b></summary>
+
+- **문제:** `Member`와 `Pet`을 양방향 1:1로 매핑할 경우, 생성 시점에 "누구를 먼저 save 해야 하는가"에 대한 순환 의존성이 발생.
+- **해결:** `Pet`은 `Member`의 존재를 모르는 순수 독립 도메인(`createDefaultPet`)으로 설계하고, `Member`가 `pet_id` FK 및 영속성 전이(`CascadeType.PERSIST`)를 단독 관리하는 **단방향 1:1 매핑**으로 결합도를 축소.
+</details>
+
+<details>
+<summary><b>2. OCP(개방-폐쇄 원칙)를 고려한 퀘스트 보상 경험치 설계</b></summary>
+
+- **문제:** 현재는 퀘스트 완료 시 20 EXP 고정 지급이지만, 향후 Phase 4에서 **'AI 기반 난이도 동적 측정'**이 들어올 예정.
+- **해결:** `Quest.createQuest` 팩토리 메서드가 보상치를 파라미터로 주입받도록 설계하여, 향후 AI RAG 파이프라인 연동 시 엔티티 코드 수정 없이 `QuestService` 로직 변경만으로 유연하게 확장 가능하도록 OCP 준수.
+</details>
