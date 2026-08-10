@@ -2,9 +2,9 @@
 
 | 개정일자 | 버전 | 주요 변경 및 반영 내용 | 작성자 |
 | :--- | :--- | :--- | :--- |
-| 2026.08.08 | v0.1.0 | Initial Project Setup & Domain Entity Design (Member, Pet, Quest) | 이장근 |
-| 2026.08.09 | v0.2.0 | Dashboard Aggregator API (`DashboardController`, `DashboardResponse`) 설계 | 이장근 |
-| 2026.08.10 | v0.3.0 | 펫 경험치 어뷰징 방지 가드레일(`QuestStatus`, `startedAt` 30분 타이머) 구축 및 단방향 1:1 영속성 전이 최적화 | 이장근 |
+| 2026.08.08 | v0.1.0 | Initial Project Setup & Domain Entity Design (Member, Pet, Quest) | Janggeun |
+| 2026.08.09 | v0.2.0 | Dashboard Aggregator API (`DashboardController`, `DashboardResponse`) 설계 | Janggeun |
+| 2026.08.10 | v0.3.0 | 펫 경험치 어뷰징 방지 가드레일(`QuestStatus`, `startedAt` 30분 타이머) 구축 및 단방향 1:1 영속성 전이 최적화 | Janggeun |
 
 ---
 
