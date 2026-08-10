@@ -65,4 +65,22 @@ public class QuestService {
         }
         return questRepository.findByMemberIdAndIsCompletedFalse(memberId);
     }
+
+    // == validation method == //
+    private void validateCreateCooldown(Long memberId) {
+        questRepository.findTopByMemberIdOrderByCreatedAtDesc(memberId)
+                .ifPresent(lastQuest -> {
+                    long minutes = Duration.between(lastQuest.getCreatedAt(), LocalDateTime.now()).toMinutes();
+                    if (minutes < CREATE_COOLDOWN_MINUTES) {
+                        throw new BusinessException(ErrorCode.QUEST_CREATE_COOLDOWN);
+                    }
+                });
+    }
+
+    private void validateCompleteCooldown(Quest quest) {
+        long minutes = Duration.between(quest.getCreatedAt(), LocalDateTime.now()).toMinutes();
+        if (minutes < COMPLETE_COOLDOWN_MINUTES) {
+            throw new BusinessException(ErrorCode.QUEST_COMPLETE_TOO_FAST);
+        }
+    }
 }
