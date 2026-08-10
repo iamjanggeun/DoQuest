@@ -70,7 +70,7 @@ public class MemoService {
         Memo memo = memoRepository.findById(memoId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
 
-        // 💡 보안 가드레일: 소유권 검증
+        // 보안 가드레일: 소유권 검증
         validateMemoOwner(memberId, memo);
 
         memoRepository.delete(memo);
