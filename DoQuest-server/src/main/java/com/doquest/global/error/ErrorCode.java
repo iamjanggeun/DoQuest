@@ -21,6 +21,10 @@ public enum ErrorCode {
     QUEST_ALREADY_COMPLETED(HttpStatus.BAD_REQUEST, "Q002", "이미 완료된 퀘스트입니다."),
     DUPLICATE_QUEST_EXISTS(HttpStatus.CONFLICT, "Q003", "유사한 퀘스트가 이미 존재합니다."),
 
+    // Quest - Abusing Guardrail (26.08.10 추가)
+    QUEST_CREATE_COOLDOWN(HttpStatus.TOO_MANY_REQUESTS, "Q004", "퀘스트는 1분에 하나씩만 등록할 수 있습니다."),
+    QUEST_COMPLETE_TOO_FAST(HttpStatus.BAD_REQUEST, "Q005", "퀘스트 생성 후 최소 3분이 지나야 완료할 수 있습니다."),
+
     // Pet
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "해당 회원의 펫을 찾을 수 없습니다.");
 
