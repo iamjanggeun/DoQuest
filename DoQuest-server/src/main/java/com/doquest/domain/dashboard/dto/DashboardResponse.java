@@ -20,14 +20,26 @@ public record DashboardResponse(
     // 내부 레코드 : 펫 정보
     public record PetInfo(Long id, String name, int level, int exp, String stage) {
         public static PetInfo from(Pet pet) {
-            return new PetInfo(pet.getId(), pet.getName(), pet.getLevel(), pet.getExp(), pet.getStage().getDescription());
+            return new PetInfo(
+                    pet.getId(),
+                    pet.getName(),
+                    pet.getLevel(),
+                    pet.getExp(),
+                    pet.getStage().getDescription()
+            );
         }
     }
 
-    // 내부 레코드 : 퀘스트 정보
-    public record QuestInfo(Long id, String title, String category, int rewardExp) {
+    // 내부 레코드 : 퀘스트 정보 (status 필드 추가 반영)
+    public record QuestInfo(Long id, String title, String category, String status, int rewardExp) {
         public static QuestInfo from(Quest quest) {
-            return new QuestInfo(quest.getId(), quest.getTitle(), quest.getCategory().getDescription(), quest.getRewardExp());
+            return new QuestInfo(
+                    quest.getId(),
+                    quest.getTitle(),
+                    quest.getCategory().getDescription(),
+                    quest.getStatus().name(), // 💡 QuestStatus Enum (IN_PROGRESS) 문자열 반환
+                    quest.getRewardExp()
+            );
         }
     }
 }
