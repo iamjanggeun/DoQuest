@@ -37,7 +37,7 @@ public record DashboardResponse(
                     quest.getId(),
                     quest.getTitle(),
                     quest.getCategory().getDescription(),
-                    quest.getStatus().name(), // 💡 QuestStatus Enum (IN_PROGRESS) 문자열 반환
+                    quest.getStatus().name(), // QuestStatus Enum (IN_PROGRESS) 문자열 반환
                     quest.getRewardExp()
             );
         }
