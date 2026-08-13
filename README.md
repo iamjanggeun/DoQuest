@@ -79,3 +79,18 @@
 - **문제:** 현재는 퀘스트 완료 시 20 EXP 고정 지급이지만, 향후 Phase 4에서 **'AI 기반 난이도 동적 측정'**이 들어올 예정.
 - **해결:** `Quest.createQuest` 팩토리 메서드가 보상치를 파라미터로 주입받도록 설계하여, 향후 AI RAG 파이프라인 연동 시 엔티티 코드 수정 없이 `QuestService` 로직 변경만으로 유연하게 확장 가능하도록 OCP 준수.
 </details>
+
+<details>
+<summary><b>3. @WebMvcTest 기반 슬라이스 테스트를 통한 입력 검증 예외(400 vs 500) 조기 발견 및 교정</b></summary>
+
+- **문제 상황 (Problem):**
+  - 메모 생성 API(`POST /api/v1/memos`) 개발 후 `@Valid` 검증 실패(공백 문자열 입력) 테스트 작성 중, 예상했던 `400 Bad Request` 대신 `500 Internal Server Error`가 반환되는 현상 발견.
+- **원인 분석 (Root Cause):**
+  - Spring MVC는 DTO 유효성 검증 실패 시 `MethodArgumentNotValidException`을 발생시킴.
+  - 전역 예외 처리기(`GlobalExceptionHandler`)에 해당 예외 전용 핸들러가 누락되어 최상위 `Exception.class` 핸들러로 인계되었고, 이로 인해 서버 내부 오류(500)로 오인 응답됨.
+- **해결 방안 (Action):**
+  - `@RestControllerAdvice`에 `MethodArgumentNotValidException` 전용 `@ExceptionHandler`를 선언하고, `ErrorCode.INVALID_INPUT_VALUE`와 함께 HTTP `400 Bad Request` 상태 코드를 명시하도록 정합성 교정.
+  - `@EnableJpaAuditing`을 메인 클래스에서 독립 `JpaConfig`로 분리하여 웹 슬라이스 테스트(`@WebMvcTest`) 컨텍스트 격리성 확보.
+- **성과 및 이점 (Result):**
+  - 실제 서버를 실행하거나 E2E 테스트를 거치지 않고 **0.5초 만에 수행되는 `@WebMvcTest` 슬라이스 테스트 환경에서 API 응답 규격 결함을 조기에 발견(Shift-Left)**하여 배포 전 리스크 최소화.
+</details>
