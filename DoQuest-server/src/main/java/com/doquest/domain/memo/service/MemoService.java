@@ -55,7 +55,7 @@ public class MemoService {
         Memo memo = memoRepository.findById(memoId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE)); // MEMO_NOT_FOUND 활용 가능
 
-        //보안 가드레일: 소유권 검증
+        // 보안 가드레일: 소유권 검증
         validateMemoOwner(memberId, memo);
 
         // 메모 도메인 내부 검증 및 수정 메서드 호출
