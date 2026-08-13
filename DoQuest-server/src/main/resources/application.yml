@@ -1,3 +1,9 @@
 spring:
   application:
     name: DoQuest-server
+
+jwt:
+  # Secret Key? 256??(32?) ????? ???.
+  secret: doquest-backend-secret-key-for-jwt-authentication-must-be-very-long
+  # 24?? (??? ??: 1000ms * 60s * 60m * 24h)
+  access-token-expiration: 86400000
