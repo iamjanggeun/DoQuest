@@ -24,9 +24,9 @@ public class DashboardController {
      */
     @GetMapping
     public ResponseEntity<DashboardResponse> getDashboard(
-            @RequestHeader("X-Member-Id") Long memberId) {
-
-        // 1. 도메인 서비스에서 각각 데이터 조회
+            @AuthenticationPrincipal Long memberId
+    ) {
+        // 도메인 서비스에서 각각 데이터 조회
         Pet myPet = petService.getPetByMemberId(memberId);
         List<Quest> uncompletedQuests = questService.findUncompletedQuests(memberId);
 
