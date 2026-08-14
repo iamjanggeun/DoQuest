@@ -31,23 +31,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        // 1. HTTP 요청 헤더에서 JWT 토큰 추출
+        // HTTP 요청 헤더에서 JWT 토큰 추출
         String token = resolveToken(request);
 
-        // 2. 토큰 유효성 검증
+        // 토큰 유효성 검증
         if (StringUtils.hasText(token) && jwtProvider.validateToken(token)) {
             Long memberId = jwtProvider.getMemberId(token);
 
-            // 3. Spring Security 인증 객체(Authentication) 생성
+            // Spring Security 인증 객체(Authentication) 생성
             // (권한 목록은 현재 사용하지 않으므로 emptyList 전달)
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(memberId, null, Collections.emptyList());
 
-            // 4. SecurityContext에 인증 정보 저장 (이후 컨트롤러에서 인증된 유저로 인식)
+            // SecurityContext에 인증 정보 저장 (이후 컨트롤러에서 인증된 유저로 인식)
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
-        // 5. 다음 필터로 요청 전달
+        // 다음 필터로 요청 전달
         filterChain.doFilter(request, response);
     }
 
