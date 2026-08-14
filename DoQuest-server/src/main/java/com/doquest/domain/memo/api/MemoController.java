@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,7 +26,7 @@ public class MemoController {
      */
     @PostMapping
     public ResponseEntity<MemoResponse> createMemo(
-            @RequestHeader("X-Member-Id") Long memberId,
+            @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody MemoCreateRequest request) {
 
         Long memoId = memoService.createMemo(memberId, request.content());
@@ -40,7 +41,8 @@ public class MemoController {
      */
     @GetMapping
     public ResponseEntity<List<MemoResponse>> getMemos(
-            @RequestHeader("X-Member-Id") Long memberId) {
+            @AuthenticationPrincipal Long memberId
+    ) {
 
         List<Memo> memos = memoService.getMemosByMemberId(memberId);
         List<MemoResponse> response = memos.stream()
@@ -55,7 +57,7 @@ public class MemoController {
      */
     @PatchMapping("/{memoId}")
     public ResponseEntity<Void> updateMemo(
-            @RequestHeader("X-Member-Id") Long memberId,
+            @AuthenticationPrincipal Long memberId,
             @PathVariable Long memoId,
             @Valid @RequestBody MemoUpdateRequest request) {
 
@@ -68,7 +70,7 @@ public class MemoController {
      */
     @DeleteMapping("/{memoId}")
     public ResponseEntity<Void> deleteMemo(
-            @RequestHeader("X-Member-Id") Long memberId,
+            @AuthenticationPrincipal Long memberId,
             @PathVariable Long memoId) {
 
         memoService.deleteMemo(memberId, memoId);
