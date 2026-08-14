@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    include: secret # application-secret.yml? ???? ??
   application:
     name: DoQuest-server
 
