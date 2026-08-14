@@ -5,6 +5,9 @@
 | 2026.08.08 | v0.1.0 | Initial Project Setup & Domain Entity Design (Member, Pet, Quest) | Janggeun |
 | 2026.08.09 | v0.2.0 | Dashboard Aggregator API (`DashboardController`, `DashboardResponse`) 설계 | Janggeun |
 | 2026.08.10 | v0.3.0 | 펫 경험치 어뷰징 방지 가드레일(`QuestStatus`, `startedAt` 30분 타이머) 구축 및 단방향 1:1 영속성 전이 최적화 | Janggeun |
+| 2026.08.12 | v0.4.0 | Memo 도메인 CRUD API 및 Java 17 `record` 기반 DTO/응답 스펙 설계 | Janggeun |
+| 2026.08.13 | v0.4.1 | `@WebMvcTest` 슬라이스 테스트 환경 구축 및 `MethodArgumentNotValidException` 핸들링을 통한 HTTP 예외 응답 정합성(400 vs 500) 교정 (`JpaConfig` 분리) | Janggeun |
+| 2026.08.14 | v0.5.0 | Spring Security 6.x + JJWT 기반 Stateless 인증 인프라 구축 (`JwtProvider`, `JwtAuthenticationFilter`, `application-secret.yml` 환경 격리) | Janggeun |
 
 ---
 
