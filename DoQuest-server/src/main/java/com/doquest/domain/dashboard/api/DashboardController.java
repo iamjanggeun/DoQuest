@@ -30,7 +30,7 @@ public class DashboardController {
         Pet myPet = petService.getPetByMemberId(memberId);
         List<Quest> uncompletedQuests = questService.findUncompletedQuests(memberId);
 
-        // 2. DTO로 조립하여 반환
+        // DTO로 조립하여 반환
         return ResponseEntity.ok(DashboardResponse.of(myPet, uncompletedQuests));
     }
 }
