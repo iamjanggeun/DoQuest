@@ -29,6 +29,8 @@ dependencies {
 
 	// Spring Security
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// Spring Security 테스트
+	testImplementation 'org.springframework.security:spring-security-test'
 
 	// JWT (JJWT 라이브러리 0.12.x 최신 표준)
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
