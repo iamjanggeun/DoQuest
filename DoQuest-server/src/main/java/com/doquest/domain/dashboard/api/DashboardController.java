@@ -7,6 +7,7 @@ import com.doquest.domain.quest.entity.Quest;
 import com.doquest.domain.quest.service.QuestService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
