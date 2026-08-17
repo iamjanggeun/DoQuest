@@ -122,5 +122,6 @@
   DB ──▶ MemoRepository ──▶ MemoService (List<Memo> 반환) ──▶ MemoController (DTO 변환) ──▶ Client
 
   [개선 (To-Be)]
-  DB ──▶ MemoRepository ──▶ MemoService (List<MemoResponse> DTO 변환) ──▶ MemoController ──▶ Client ```
+  DB ──▶ MemoRepository ──▶ MemoService (List<MemoResponse> DTO 변환) ──▶ MemoController ──▶ Client
+```
 </details>
