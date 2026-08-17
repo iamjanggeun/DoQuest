@@ -8,6 +8,7 @@
 | 2026.08.12 | v0.4.0 | Memo 도메인 CRUD API 및 Java 17 `record` 기반 DTO/응답 스펙 설계 | Janggeun |
 | 2026.08.13 | v0.4.1 | `@WebMvcTest` 슬라이스 테스트 환경 구축 및 `MethodArgumentNotValidException` 핸들링을 통한 HTTP 예외 응답 정합성(400 vs 500) 교정 (`JpaConfig` 분리) | Janggeun |
 | 2026.08.14 | v0.5.0 | Spring Security 6.x + JJWT 기반 Stateless 인증 인프라 구축 (`JwtProvider`, `JwtAuthenticationFilter`, `application-secret.yml` 환경 격리) | Janggeun |
+| 2026.08.17 | v0.5.1 | Memo 도메인 계층 격리(Service DTO 반환) 및 `@AuthenticationPrincipal` 전환, 테스트 표준화(`@MockitoBean`) | Janggeun |
 
 ---
 
@@ -96,4 +97,23 @@
   - `@EnableJpaAuditing`을 메인 클래스에서 독립 `JpaConfig`로 분리하여 웹 슬라이스 테스트(`@WebMvcTest`) 컨텍스트 격리성 확보.
 - **성과 및 이점 (Result):**
   - 실제 서버를 실행하거나 E2E 테스트를 거치지 않고 **0.5초 만에 수행되는 `@WebMvcTest` 슬라이스 테스트 환경에서 API 응답 규격 결함을 조기에 발견(Shift-Left)**하여 배포 전 리스크 최소화.
+</details>
+
+<details>
+<summary><b>4. 계층 간 결합도 축소를 위한 DTO 반환 리팩토링 및 테스트 코드 동기화</b></summary>
+
+- **문제 상황 (Problem):**
+  - `MemoService`가 영속성 엔티티(`Memo`)를 Presentation 계층(Controller)으로 직접 반환하고 있어 도메인 계층과 웹 계층 간 강한 결합(Tight Coupling)이 발생.
+  - Spring Security 적용 및 API 응답 스펙을 명확히 하기 위해 Service 반환 타입을 DTO(`MemoResponse`)로 전환하는 과정에서, 기존 단위/슬라이스 테스트(`MemoServiceTest`, `MemoControllerTest`)에 타입 불일치 컴파일 에러 및 스펙 불일치 테스트 실패 다수 발생.
+- **원인 분석 (Root Cause):**
+  - 엔티티의 변경이 Presentation 계층의 JSON 응답 스펙에 즉각적인 영향을 주는 구조였음.
+  - 기존 테스트 코드 내 Mocking Stubbing(`willReturn`) 및 단언(Assertion) 로직이 엔티티 인스턴스에 강하게 의존하고 있어, 반환 타입 변경 시 테스트 코드가 연쇄적으로 깨짐.
+- **해결 방안 (Action):**
+  - `MemoResponse` Record 내부에 정적 팩토리 메서드(`from(Memo memo)`)를 구현하여 엔티티 to DTO 변환 책임을 캡슐화.
+  - `MemoService` 내부에서 DTO 변환을 완료하여 Controller로 전달하도록 계층 간 역할을 명확히 분리.
+  - `MemoRepository`의 최신순 정렬 메서드(`findByMemberIdOrderByCreatedAtDesc`) 호출부와 Service 로직의 정합성을 동기화.
+  - `MemoServiceTest`의 검증 대상을 DTO 필드 단언으로 수정하고, Spring Boot 최신 테스트 표준인 `@MockitoBean`을 적용하여 전체 테스트 성공
+- **성과 및 이점 (Result):**
+  - 도메인 엔티티의 내부 구현 변경이 외부 API 스펙(DTO)으로 전파되지 않도록 계층 간 독립성 확보.
+  - 계층 분리 리팩토링 과정에서 단위/슬라이스 테스트를 함께 동기화하여 변경에 안전한 테스트 코드베이스 구축.
 </details>
