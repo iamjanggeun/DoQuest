@@ -116,9 +116,6 @@
 - **성과 및 이점 (Result):**
   - 도메인 엔티티의 내부 구현 변경이 외부 API 스펙(DTO)으로 전파되지 않도록 계층 간 독립성 확보.
   - 계층 분리 리팩토링 과정에서 단위/슬라이스 테스트를 함께 동기화하여 변경에 안전한 테스트 코드베이스 구축.
-  - [기존]
-DB ➔ MemoRepository ➔ MemoService (List<Memo> 엔티티 반환) ➔ MemoController (.map(MemoResponse::from) 변환) ➔ 클라이언트 (DTO 응답)
-
-[현재]
-DB ➔ MemoRepository ➔ MemoService (.map(MemoResponse::from) DTO 변환) ➔ MemoController (List<MemoResponse> 그대로 전달) ➔ 클라이언트 (DTO 응답)
+  - [기존] DB ➔ MemoRepository ➔ MemoService (List<Memo> 엔티티 반환) ➔ MemoController (.map(MemoResponse::from) 변환) ➔ 클라이언트 (DTO 응답)
+  - [현재]DB ➔ MemoRepository ➔ MemoService (.map(MemoResponse::from) DTO 변환) ➔ MemoController (List<MemoResponse> 그대로 전달) ➔ 클라이언트 (DTO 응답)
 </details>
