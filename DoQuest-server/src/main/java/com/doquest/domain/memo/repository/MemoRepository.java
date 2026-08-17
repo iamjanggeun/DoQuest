@@ -7,6 +7,6 @@ import java.util.List;
 
 public interface MemoRepository extends JpaRepository<Memo, Long> {
 
-    // 회원의 메모 목록 최신순 조회
+    // 복합 인덱스(member_id, createdAt)를 타는 최신순 조회 쿼리 메서드
     List<Memo> findByMemberIdOrderByCreatedAtDesc(Long memberId);
 }

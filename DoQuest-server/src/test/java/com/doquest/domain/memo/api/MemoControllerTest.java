@@ -12,30 +12,27 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doNothing;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(MemoController.class)
-@AutoConfigureMockMvc(addFilters = false) // 👈 슬라이스 테스트에서 Security Filter Chain을 우회하여 순수 Web Layer 검증에 집중
+@AutoConfigureMockMvc(addFilters = false) // Web 레이어 단위 검증 집중을 위해 Security Filter 격리
 class MemoControllerTest {
 
     @Autowired
@@ -44,14 +41,12 @@ class MemoControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private MemoService memoService;
-
-    @MockBean
-    private JwtProvider jwtProvider; // Security 의존성 Mocking
-
-    @MockBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter; // Security 의존성 Mocking
+    @MockitoBean
+    private JwtProvider jwtProvider;
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     private void setMockAuthentication(Long memberId) {
         UsernamePasswordAuthenticationToken auth =
@@ -69,7 +64,7 @@ class MemoControllerTest {
         setMockAuthentication(memberId);
 
         MemoCreateRequest request = new MemoCreateRequest("Spring Security 공부하기");
-        given(memoService.createMemo(eq(memberId), any())).willReturn(100L);
+        given(memoService.createMemo(eq(memberId), eq(request.content()))).willReturn(100L);
 
         // when & then
         mockMvc.perform(post("/api/v1/memos")
@@ -94,9 +89,9 @@ class MemoControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.code").value("G001"));
+                .andExpect(status().isBadRequest()) // HTTP Status 400 검증
+                .andExpect(jsonPath("$.code").value("C001")) // 실제 에러 코드 검증
+                .andExpect(jsonPath("$.message").value("적절하지 않은 요청 값입니다."));
     }
 
     @Test
@@ -107,17 +102,19 @@ class MemoControllerTest {
         setMockAuthentication(memberId);
 
         List<MemoResponse> responses = List.of(
-                new MemoResponse(1L, "첫 번째 메모", LocalDateTime.now(), LocalDateTime.now()),
-                new MemoResponse(2L, "두 번째 메모", LocalDateTime.now(), LocalDateTime.now())
+                new MemoResponse(1L, "첫 번째 메모", false, LocalDateTime.now()),
+                new MemoResponse(2L, "두 번째 메모", false, LocalDateTime.now())
         );
-        given(memoService.getMemos(memberId)).willReturn(responses);
+
+        given(memoService.getMemosByMemberId(memberId)).willReturn(responses);
 
         // when & then
         mockMvc.perform(get("/api/v1/memos"))
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].content").value("첫 번째 메모"));
+                .andExpect(jsonPath("$[0].content").value("첫 번째 메모"))
+                .andExpect(jsonPath("$[0].isParsed").value(false));
     }
 
     @Test
@@ -129,7 +126,7 @@ class MemoControllerTest {
         setMockAuthentication(memberId);
 
         MemoUpdateRequest request = new MemoUpdateRequest("수정된 메모 내용");
-        doNothing().when(memoService).updateMemo(eq(memberId), eq(memoId), any());
+        doNothing().when(memoService).updateMemo(eq(memberId), eq(memoId), eq(request.content()));
 
         // when & then
         mockMvc.perform(patch("/api/v1/memos/{memoId}", memoId)

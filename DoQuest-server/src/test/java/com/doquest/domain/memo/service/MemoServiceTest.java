@@ -2,6 +2,7 @@ package com.doquest.domain.memo.service;
 
 import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.member.repository.MemberRepository;
+import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.global.error.BusinessException;
@@ -53,7 +54,7 @@ class MemoServiceTest {
 
         // then
         assertThat(savedId).isEqualTo(100L);
-        assertThat(memo.isParsed()).isFalse(); // 생성 시점 기본값 false 검증
+        assertThat(memo.isParsed()).isFalse();
         verify(memoRepository).save(any(Memo.class));
     }
 
@@ -71,7 +72,7 @@ class MemoServiceTest {
     }
 
     @Test
-    @DisplayName("회원의 최신 메모 목록을 성공적으로 조회한다")
+    @DisplayName("회원의 최신 메모 목록을 성공적으로 조회하여 DTO로 변환한다")
     void getMemosByMemberId_성공() {
         // given
         Long memberId = 1L;
@@ -79,15 +80,26 @@ class MemoServiceTest {
         Memo memo1 = Memo.createMemo(member, "메모 1");
         Memo memo2 = Memo.createMemo(member, "메모 2");
 
+        ReflectionTestUtils.setField(memo1, "id", 1L);
+        ReflectionTestUtils.setField(memo2, "id", 2L);
+
         given(memberRepository.existsById(memberId)).willReturn(true);
         given(memoRepository.findByMemberIdOrderByCreatedAtDesc(memberId)).willReturn(List.of(memo2, memo1));
 
         // when
-        List<Memo> result = memoService.getMemosByMemberId(memberId);
+        List<MemoResponse> result = memoService.getMemosByMemberId(memberId);
 
         // then
         assertThat(result).hasSize(2);
-        assertThat(result).containsExactly(memo2, memo1);
+        // DTO 내부 값 검증 (최신순 memo2 -> memo1)
+        assertThat(result.get(0).id()).isEqualTo(2L);
+        assertThat(result.get(0).content()).isEqualTo("메모 2");
+        assertThat(result.get(0).isParsed()).isFalse();
+
+        assertThat(result.get(1).id()).isEqualTo(1L);
+        assertThat(result.get(1).content()).isEqualTo("메모 1");
+        assertThat(result.get(1).isParsed()).isFalse();
+
         verify(memoRepository).findByMemberIdOrderByCreatedAtDesc(memberId);
     }
 

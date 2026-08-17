@@ -3,7 +3,6 @@ package com.doquest.domain.memo.api;
 import com.doquest.domain.memo.dto.MemoCreateRequest;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.dto.MemoUpdateRequest;
-import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.service.MemoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,38 +21,30 @@ public class MemoController {
     private final MemoService memoService;
 
     /**
-     * 자유 메모 등록
+     * 메모 생성 (201 Created -> 생성된 memoId 반환)
      */
     @PostMapping
-    public ResponseEntity<MemoResponse> createMemo(
+    public ResponseEntity<Long> createMemo(
             @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody MemoCreateRequest request) {
 
         Long memoId = memoService.createMemo(memberId, request.content());
-
-        // 메모 단건 생성 결과 DTO 조립하여 201 Created 응답
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new MemoResponse(memoId, request.content(), false, null));
+        return ResponseEntity.status(HttpStatus.CREATED).body(memoId);
     }
 
     /**
-     * 회원의 최신 메모 목록 조회
+     * 회원의 최신 메모 목록 조회 (200 OK)
      */
     @GetMapping
     public ResponseEntity<List<MemoResponse>> getMemos(
-            @AuthenticationPrincipal Long memberId
-    ) {
+            @AuthenticationPrincipal Long memberId) {
 
-        List<Memo> memos = memoService.getMemosByMemberId(memberId);
-        List<MemoResponse> response = memos.stream()
-                .map(MemoResponse::from)
-                .toList();
-
-        return ResponseEntity.ok(response);
+        List<MemoResponse> responses = memoService.getMemosByMemberId(memberId);
+        return ResponseEntity.ok(responses);
     }
 
     /**
-     * 메모 내용 수정
+     * 메모 내용 수정 (200 OK)
      */
     @PatchMapping("/{memoId}")
     public ResponseEntity<Void> updateMemo(
@@ -66,7 +57,7 @@ public class MemoController {
     }
 
     /**
-     * 메모 삭제
+     * 메모 삭제 (204 No Content)
      */
     @DeleteMapping("/{memoId}")
     public ResponseEntity<Void> deleteMemo(
@@ -74,6 +65,6 @@ public class MemoController {
             @PathVariable Long memoId) {
 
         memoService.deleteMemo(memberId, memoId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }

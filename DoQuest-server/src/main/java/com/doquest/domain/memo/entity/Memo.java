@@ -14,7 +14,7 @@ import static jakarta.persistence.GenerationType.IDENTITY;
 @Table(
         name = "memos",
         indexes = {
-                // 특정 회원의 메모 목록 최신순 조회 최적화를 위한 인덱스
+                // 특정 회원의 메모 목록 최신순 조회 인덱스 최적화
                 @Index(name = "idx_memos_member_created", columnList = "member_id, createdAt")
         }
 )
@@ -45,15 +45,11 @@ public class Memo extends BaseTimeEntity {
         Memo memo = new Memo();
         memo.member = member;
         memo.content = content;
-        memo.isParsed = false; // 생성 시 기본값은 false
+        memo.isParsed = false;
         return memo;
     }
 
     // == 비즈니스 로직 == //
-
-    /**
-     * 메모 내용 수정
-     */
     public void updateContent(String newContent) {
         if (newContent == null || newContent.trim().isEmpty()) {
             throw new IllegalArgumentException("수정할 메모 내용은 공백일 수 없습니다.");
@@ -61,9 +57,6 @@ public class Memo extends BaseTimeEntity {
         this.content = newContent;
     }
 
-    /**
-     * AI 파싱 완료 처리 (비동기 파이프라인 호출용)
-     */
     public void markAsParsed() {
         this.isParsed = true;
     }
