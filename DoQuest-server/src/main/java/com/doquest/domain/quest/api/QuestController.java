@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,7 +21,7 @@ public class QuestController {
      */
     @PostMapping
     public ResponseEntity<Void> createQuest(
-            @RequestHeader("X-Member-Id") Long memberId,
+            @AuthenticationPrincipal Long memberId,
             @Valid @RequestBody QuestCreateRequest request) { // Valid로 검증 동작
 
         questService.createQuest(memberId, request.title(), request.category());
