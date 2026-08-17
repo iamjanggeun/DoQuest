@@ -3,3 +3,9 @@ spring:
     include: secret # application-secret.yml? ???? ??
   application:
     name: DoQuest-server
+
+ai:
+  service:
+    base-url: https://localhost:8000
+    connect-timeout-ms: 3000
+    read-timeout-ms : 10000           # LLM I/O 지연 대비
