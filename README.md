@@ -128,6 +128,7 @@
 
 <details>
 <summary><b>5. Spring 6 RestClient 슬라이스 테스트 격리 실패 이슈</b></summary>
+
 - **문제 상황:**
   - `@RestClientTest` 실행 시 실제 타겟 서버(`localhost:8000`)로의 연결을 시도하여 `Connection refused` 발생.
 - **원인 분석:** 
