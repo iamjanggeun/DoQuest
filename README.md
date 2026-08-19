@@ -125,3 +125,15 @@
   DB ──▶ MemoRepository ──▶ MemoService (List<MemoResponse> DTO 변환) ──▶ MemoController ──▶ Client
 ```
 </details>
+
+<details>
+<summary><b>5. Spring 6 RestClient 슬라이스 테스트 격리 실패 이슈</b></summary>
+- **문제 상황:**
+  - `@RestClientTest` 실행 시 실제 타겟 서버(`localhost:8000`)로의 연결을 시도하여 `Connection refused` 발생.
+- **원인 분석:** 
+  - `AiClientConfig`에서 타임아웃 설정을 위해 생성한 `SimpleClientHttpRequestFactory`가 `@RestClientTest`의 내부 Mock RequestFactory를 덮어써 가로채기(Mock) 실패.
+- **해결 방안:**
+  - `@BeforeEach`에서 `MockRestServiceServer.bindTo(restClientBuilder)`를 통해 Mocking 채널이 연결된 `RestClient`를 직접 빌드하여 `AiClient`에 수동 주입하도록 테스트   아키텍처 리팩토링.
+- **결과:** 
+  - 외부 AI 서버 의존성 0%, 0.2초 이내의 초고속 슬라이스 테스트 파이프라인 구축 완료.
+</details>
