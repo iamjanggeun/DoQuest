@@ -4,6 +4,7 @@ import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.member.repository.MemberRepository;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
+import com.doquest.domain.memo.event.MemoCreatedEvent;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -36,14 +38,18 @@ class MemoServiceTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher; // 👈 비동기 이벤트 발행 검증용 Mock 주입
+
     @Test
-    @DisplayName("정상적인 내용으로 메모를 생성하면 메모 ID가 반환된다")
+    @DisplayName("정상적인 내용으로 메모를 생성하면 메모 ID가 반환되고 AI 파싱 이벤트가 발행된다")
     void createMemo_성공() {
         // given
         Long memberId = 1L;
         Member member = Member.createMember("test@email.com", "pass", "닉네임", null);
-        Memo memo = Memo.createMemo(member, "내일 2시 알고리즘 스터디");
+        ReflectionTestUtils.setField(member, "id", memberId);
 
+        Memo memo = Memo.createMemo(member, "내일 2시 알고리즘 스터디");
         ReflectionTestUtils.setField(memo, "id", 100L);
 
         given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
@@ -56,6 +62,9 @@ class MemoServiceTest {
         assertThat(savedId).isEqualTo(100L);
         assertThat(memo.isParsed()).isFalse();
         verify(memoRepository).save(any(Memo.class));
+
+        // 👈 도메인 이벤트(MemoCreatedEvent)가 정상 발행되었는지 검증
+        verify(eventPublisher).publishEvent(any(MemoCreatedEvent.class));
     }
 
     @Test
@@ -91,7 +100,6 @@ class MemoServiceTest {
 
         // then
         assertThat(result).hasSize(2);
-        // DTO 내부 값 검증 (최신순 memo2 -> memo1)
         assertThat(result.get(0).id()).isEqualTo(2L);
         assertThat(result.get(0).content()).isEqualTo("메모 2");
         assertThat(result.get(0).isParsed()).isFalse();
