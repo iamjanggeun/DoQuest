@@ -58,6 +58,7 @@ public class MemoService {
                 .toList();
     }
 
+
     @Transactional
     public void updateMemo(Long memberId, Long memoId, String newContent) {
         Memo memo = memoRepository.findById(memoId)

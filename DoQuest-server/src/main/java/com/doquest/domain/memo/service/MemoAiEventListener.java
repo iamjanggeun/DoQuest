@@ -27,6 +27,7 @@ public class MemoAiEventListener {
         log.info("[AI 비동기 파이프라인 트리거] thread={}, memoId={}",
                 Thread.currentThread().getName(), event.memoId());
 
+
         try {
             // FastAPI AI 엔진 호출 (LangChain + Gemini 추론)
             AiParserDto.Response response = aiClient.parseMemo(event.memberId(), event.content());
