@@ -3,7 +3,9 @@ spring:
     name: DoQuest-server
   profiles:
     active: local
-    include: secret # application-secret.yml 병합 (JWT 시크릿 로드)
+  config:
+    import:
+      - classpath:application-secret.yml # Spring Boot 3.x 표준: 시크릿 파일 명시적 임포트
 
 ---
 # 로컬 개발 및 E2E 테스트용 프로파일 (H2 In-Memory)
@@ -28,10 +30,10 @@ spring:
       hibernate:
         format_sql: true
         show_sql: true
-        default_batch_fetch_size: 100 # N+1 문제 방어
+        default_batch_fetch_size: 100 # 글로벌 배치 사이즈 설정 (N+1 문제 방어)
 
 ai:
   service:
-    base-url: http://localhost:8000 # 👈 https -> http 프로토콜 교정
+    base-url: http://localhost:8000
     connect-timeout-ms: 3000
-    read-timeout-ms: 10000          # LLM I/O 지연 대비
+    read-timeout-ms: 10000 # LLM I/O 지연 대비 타임아웃 10초 설정
