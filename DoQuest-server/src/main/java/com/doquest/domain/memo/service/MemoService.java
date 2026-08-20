@@ -4,15 +4,19 @@ import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.member.repository.MemberRepository;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
+import com.doquest.domain.memo.event.MemoCreatedEvent;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -20,9 +24,10 @@ public class MemoService {
 
     private final MemoRepository memoRepository;
     private final MemberRepository memberRepository;
+    private final ApplicationEventPublisher eventPublisher; // 이벤트 발행기 주입
 
     /**
-     * 신규 메모 생성
+     * 신규 메모 생성 및 비동기 AI 파싱 이벤트 트리거 추가
      */
     @Transactional
     public Long createMemo(Long memberId, String content) {
@@ -32,14 +37,17 @@ public class MemoService {
         Memo memo = Memo.createMemo(member, content);
         Memo savedMemo = memoRepository.save(memo);
 
-        // TODO: Phase 4에서 비동기 AI 파이프라인(FastAPI + LangChain) 호출 이벤트 발행
+        // 비동기 AI 파싱 도메인 이벤트 발행 (트랜잭션 Commit 완료 후 리스너 동작)
+        eventPublisher.publishEvent(new MemoCreatedEvent(
+                savedMemo.getId(),
+                member.getId(),
+                savedMemo.getContent()
+        ));
 
+        log.info("[메모 생성] memoId={}, memberId={}, AI 파싱 이벤트 발행 완료", savedMemo.getId(), memberId);
         return savedMemo.getId();
     }
 
-    /**
-     * 회원의 최신 메모 목록 조회 (DTO로 변환하여 영속성 컨텍스트 의존 분리)
-     */
     public List<MemoResponse> getMemosByMemberId(Long memberId) {
         if (!memberRepository.existsById(memberId)) {
             throw new BusinessException(ErrorCode.MEMBER_NOT_FOUND);
@@ -50,9 +58,6 @@ public class MemoService {
                 .toList();
     }
 
-    /**
-     * 메모 내용 수정
-     */
     @Transactional
     public void updateMemo(Long memberId, Long memoId, String newContent) {
         Memo memo = memoRepository.findById(memoId)
@@ -62,9 +67,6 @@ public class MemoService {
         memo.updateContent(newContent);
     }
 
-    /**
-     * 메모 삭제
-     */
     @Transactional
     public void deleteMemo(Long memberId, Long memoId) {
         Memo memo = memoRepository.findById(memoId)
@@ -74,9 +76,6 @@ public class MemoService {
         memoRepository.delete(memo);
     }
 
-    /**
-     * AI 파싱 완료 처리 (Phase 4 전용)
-     */
     @Transactional
     public void completeParsing(Long memoId) {
         Memo memo = memoRepository.findById(memoId)
@@ -85,7 +84,6 @@ public class MemoService {
         memo.markAsParsed();
     }
 
-    // == 소유권 검증 (BOLA / IDOR 방어) == //
     private void validateMemoOwner(Long memberId, Memo memo) {
         if (!memo.getMember().getId().equals(memberId)) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
