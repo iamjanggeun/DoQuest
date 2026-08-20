@@ -9,6 +9,9 @@
 | 2026.08.13 | v0.4.1 | `@WebMvcTest` 슬라이스 테스트 환경 구축 및 `MethodArgumentNotValidException` 핸들링을 통한 HTTP 예외 응답 정합성(400 vs 500) 교정 (`JpaConfig` 분리) | Janggeun |
 | 2026.08.14 | v0.5.0 | Spring Security 6.x + JJWT 기반 Stateless 인증 인프라 구축 (`JwtProvider`, `JwtAuthenticationFilter`, `application-secret.yml` 환경 격리) | Janggeun |
 | 2026.08.17 | v0.5.1 | Memo 도메인 계층 격리(Service DTO 반환) 및 `@AuthenticationPrincipal` 전환, 테스트 표준화(`@MockitoBean`) | Janggeun |
+| 2026.08.18 | v0.6.0 | FastAPI + LangChain LCEL 기반 비동기 AI 서빙 엔진(doquest-ai) 구축 및 어댑터 패턴 기반 슬라이스 테스트(pytest) 작성 | Janggeun |
+| 2026.08.19 | v0.6.1 | Spring 6 RestClient 통신 계층 구현 및 MockRestServiceServer 바인딩 트러블슈팅을 통한 외부 의존성 0% 슬라이스 테스트(AiClientTest) 완성 | Janggeun |
+| 2026.08.20 | v0.7.0 | Spring Event 기반 비동기 AI 파이프라인 구축 (AsyncConfig 전용 스레드 풀 격리, @TransactionalEventListener(AFTER_COMMIT) 및 내결함성 단위 검증 완료) | Janggeun |
 
 ---
 
