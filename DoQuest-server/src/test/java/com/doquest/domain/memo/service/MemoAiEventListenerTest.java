@@ -37,11 +37,12 @@ class MemoAiEventListenerTest {
         // given
         MemoCreatedEvent event = new MemoCreatedEvent(100L, 1L, "내일 2시 알고리즘 스터디");
         AiParserDto.Response mockResponse = new AiParserDto.Response(
-                true,
-                "알고리즘 스터디",
-                "2026-08-21",
-                "알고리즘 문제 풀이 및 코드 리뷰",
-                List.of("https://github.com/study")
+                true,                  // isSchedule
+                "알고리즘 스터디",                   // title
+                "2026-08-21 14:00",              // scheduledAt
+                "강남역 인근 스터디룸",               // location
+                "알고리즘 문제 풀이 및 코드 리뷰",      // summaryInfo
+                List.of("https://github.com/study") // actionLinks
         );
 
         given(aiClient.parseMemo(1L, "내일 2시 알고리즘 스터디")).willReturn(mockResponse);
