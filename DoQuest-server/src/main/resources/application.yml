@@ -1,11 +1,37 @@
 spring:
-  profiles:
-    include: secret # application-secret.yml? ???? ??
   application:
     name: DoQuest-server
+  profiles:
+    active: local
+    include: secret # application-secret.yml 병합 (JWT 시크릿 로드)
+
+---
+# 로컬 개발 및 E2E 테스트용 프로파일 (H2 In-Memory)
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:doquest;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update # 엔티티 기반 로컬 테이블 자동 생성
+    properties:
+      hibernate:
+        format_sql: true
+        show_sql: true
+        default_batch_fetch_size: 100 # N+1 문제 방어
 
 ai:
   service:
-    base-url: https://localhost:8000
+    base-url: http://localhost:8000 # 👈 https -> http 프로토콜 교정
     connect-timeout-ms: 3000
-    read-timeout-ms : 10000           # LLM I/O 지연 대비
+    read-timeout-ms: 10000          # LLM I/O 지연 대비
