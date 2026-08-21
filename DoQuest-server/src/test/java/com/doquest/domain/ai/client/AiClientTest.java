@@ -58,7 +58,7 @@ class AiClientTest {
                     {
                         "is_schedule": true,
                         "title": "백준 골드 DP 문제 풀이",
-                        "target_date": "2026-08-18",
+                        "scheduled_at": "2026-08-18",
                         "summary_info": "동적 계획법 점화식 도출 및 풀이",
                         "action_links": [
                             "https://www.acmicpc.net"
@@ -76,12 +76,12 @@ class AiClientTest {
             AiParserDto.Response response = aiClient.parseMemo(1L, "내일 저녁 백준 DP 문제 풀기");
 
             assertThat(response).isNotNull();
-            assertThat(response.is_schedule()).isTrue();
+            assertThat(response.isSchedule()).isTrue();
             assertThat(response.title()).isEqualTo("백준 골드 DP 문제 풀이");
-            assertThat(response.target_date()).isEqualTo("2026-08-18");
-            assertThat(response.summary_info()).contains("동적 계획법");
-            assertThat(response.action_links()).hasSize(1);
-            assertThat(response.action_links().get(0)).isEqualTo("https://www.acmicpc.net");
+            assertThat(response.scheduledAt()).isEqualTo("2026-08-18");
+            assertThat(response.summaryInfo()).contains("동적 계획법");
+            assertThat(response.actionLinks()).hasSize(1);
+            assertThat(response.actionLinks().get(0)).isEqualTo("https://www.acmicpc.net");
 
             mockServer.verify();
         }
