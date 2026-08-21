@@ -12,6 +12,7 @@
 | 2026.08.18 | v0.6.0 | FastAPI + LangChain LCEL 기반 비동기 AI 서빙 엔진(doquest-ai) 구축 및 어댑터 패턴 기반 슬라이스 테스트(pytest) 작성 | Janggeun |
 | 2026.08.19 | v0.6.1 | Spring 6 RestClient 통신 계층 구현 및 MockRestServiceServer 바인딩 트러블슈팅을 통한 외부 의존성 0% 슬라이스 테스트(AiClientTest) 완성 | Janggeun |
 | 2026.08.20 | v0.7.0 | Spring Event 기반 비동기 AI 파이프라인 구축 (AsyncConfig 전용 스레드 풀 격리, @TransactionalEventListener(AFTER_COMMIT) 및 내결함성 단위 검증 완료) | Janggeun |
+| 2026.08.21 | v0.7.1 | Spring Event 기반 비동기 AI 파이프라인 구축 및 E2E 검증 | Janggeun |
 
 ---
 
@@ -140,4 +141,23 @@
   - `@BeforeEach`에서 `MockRestServiceServer.bindTo(restClientBuilder)`를 통해 Mocking 채널이 연결된 `RestClient`를 직접 빌드하여 `AiClient`에 수동 주입하도록 테스트   아키텍처 리팩토링.
 - **결과:** 
   - 외부 AI 서버 의존성 0%, 0.2초 이내의 초고속 슬라이스 테스트 파이프라인 구축 완료.
+</details>
+
+<details>
+<summary><b>6. 외부 AI I/O 블로킹 격리 및 비동기 E2E 검증</b></summary>
+
+- **문제 상황:**
+  - 메모 작성과 FastAPI 연동을 진행했을때 클라이언트 응답 시간이 오래 걸리는 문제
+- **원인 분석:** 
+  - 동기 방식으로 FastAPI(LLM 추론)를 호출할 경우, 외부 네트워크 지연(평균 1.8초)으로 인해 클라이언트 응답 시간이 과도하게 증가했음.
+- **해결 방안:**
+  - ApplicationEventPublisher를 도입하여 메모 쓰기 트랜잭션 커밋 직후 (AFTER_COMMIT) 비동기 이벤트 발행.
+  - aiTaskExecutor 독립 스레드풀을 통해 RestClient 호출을 격리 처리함으로써 메인 스레드 블로킹 해소.
+- **검증 결과:** 
+  - Postman 기반 JWT 발급 → 메모 생성 → FastAPI AI 추론 → DB 후처리 전 과정 검증 성공.
+  - 메모 저장 API 응답 속도 1,800ms → 130ms(Cold) / 20ms(Warm) 로 대폭 단축.
+  - 외부 AI API 장애 발생 시에도 사용자 메모 원본 데이터의 영속성을 100% 보장하는 내결함성(Resilience) 확보.
+```
+비동기 이벤트 기반 아키텍처(EDA)를 통해 코어 비즈니스 트랜잭션과 외부 AI 통신을 물리적으로 분리함으로써, 시스템 가용성 보장과 레이턴시 90% 단축을 동시에 달성한 경험 (추후 삭제)
+```
 </details>
