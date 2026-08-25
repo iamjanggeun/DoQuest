@@ -14,13 +14,13 @@ public class AiClient {
 
     private final RestClient aiRestClient;
 
-    public AiParserDto.Response parseMemo(Long memberId, String content) {
-        log.info("[AI Client] 메모 파싱 요청 전송: memberId={}, content={}", memberId, content);
+    public AiParserDto.Response parseMemo(Long memoId, Long memberId, String content) {
+        log.info("[AI Client] 메모 파싱 요청 전송: memoId={}, memberId={}, content={}", memoId, memberId, content);
 
         return aiRestClient.post()
                 .uri("/api/v1/ai/parse-memo")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new AiParserDto.Request(memberId, content))
+                .body(new AiParserDto.Request(memoId, memberId, content))
                 .retrieve()
                 .body(AiParserDto.Response.class);
     }
