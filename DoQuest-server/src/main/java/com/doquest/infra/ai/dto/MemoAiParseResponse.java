@@ -7,7 +7,7 @@ public record MemoAiParseResponse(
         String title,
         String scheduledAt,
         String location,
-        List<String> links,
-        List<String> tags
+        String summaryInfo,
+        List<String> actionLinks
 ) {
 }
