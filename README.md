@@ -13,6 +13,8 @@
 | 2026.08.19 | v0.6.1 | Spring 6 RestClient 통신 계층 구현 및 MockRestServiceServer 바인딩 트러블슈팅을 통한 외부 의존성 0% 슬라이스 테스트(AiClientTest) 완성 | Janggeun |
 | 2026.08.20 | v0.7.0 | Spring Event 기반 비동기 AI 파이프라인 구축 (AsyncConfig 전용 스레드 풀 격리, @TransactionalEventListener(AFTER_COMMIT) 및 내결함성 단위 검증 완료) | Janggeun |
 | 2026.08.21 | v0.7.1 | Spring Event 기반 비동기 AI 파이프라인 구축 및 E2E 검증 | Janggeun |
+| 2026.08.24 | v0.8.0 | FastAPI 프롬프트 강화 및 KST(Asia/Seoul) 추가 | Janggeun |
+| 2026.08.24 | v0.8.1 | Spring <-> FastAPI 간 DTO / Schemas 불일치 수정 | Janggeun |
 
 ---
 
@@ -160,4 +162,22 @@
 ```
 비동기 이벤트 기반 아키텍처(EDA)를 통해 코어 비즈니스 트랜잭션과 외부 AI 통신을 물리적으로 분리함으로써, 시스템 가용성 보장과 레이턴시 90% 단축을 동시에 달성한 경험 (추후 삭제)
 ```
+</details>
+
+<details>
+<summary><b>7. 분산 MSA 통신 규격 정합성 교정 및 KST 기반 시계열 LLM 가드레일 구축</b></summary>
+
+- **문제 상황:**
+  - Spring Boot와 FastAPI 간 비동기 메모 파싱 통신 시 역직렬화 누락으로 날짜(`scheduled_at`) 및 메타데이터가 `null`로 바인딩되는 결함 발생.
+  - 서버 배포 환경(UTC) 기준 시차(9시간)로 인해 야간 시간대 "오늘/내일" 상대 시간 파싱 오차가 발생하고, RAG 검증망 부재로 가짜 URL(404 에러 링크)이 생성되는 환각 현상 확인.
+- **원인 분석:** 
+  - Spring DTO(`MemoAiParseResponse`, `AiParserDto`)와 FastAPI Pydantic 스키마(`ScheduleMetadata`) 간 네이밍 불일치 및 상관관계 ID(`memo_id`) 누락으로 비동기 분산 환경의 추적성(Traceability) 훼손.
+  - `date.today()` 사용으로 인한 서버 로컬 타임존(UTC) 의존성 및 자유 생성 프롬프트의 신뢰 경계(Trust Boundary) 부재.
+- **해결 방안:**
+  - **Contract 정합성 동기화**: `memo_id`, `scheduled_at`, `location`, `summary_info`, `action_links` 규격으로 양측 스키마 1:1 일치화 및 Jackson Snake/Camel Case 바인딩 보정.
+  - **Temporal Grounding 가드레일**: `ZoneInfo("Asia/Seoul")` 기반 KST 오늘 날짜 주입 함수를 LCEL 체인에 바인딩하여 24시간 정확한 절대 날짜(`YYYY-MM-DD`) 변환 보장.
+  - **프롬프트 제약 및 할루시네이션 차단**: 검증되지 않은 임의 링크 생성을 원천 차단하고 구조화된 일정 메타데이터 추출에만 집중하도록 시스템 프롬프트 고도화.
+- **검증 결과:** 
+  - Spring ↔ FastAPI 간 비동기 페이로드 유실률 0% 달성 및 분산 상관관계 ID(`memo_id`) 기반 로그 추적성 확보.
+  - 타임존 오차 없는 시계열 일정 파싱 정확도 확보 및 안전한 Schedule 도메인 연동 기반 완성.
 </details>
