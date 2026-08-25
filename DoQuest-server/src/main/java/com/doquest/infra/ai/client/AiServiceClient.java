@@ -25,13 +25,13 @@ public class AiServiceClient {
     /**
      * FastAPI 서버로 비동기 LLM 파싱 요청 전송
      */
-    public MemoAiParseResponse parseMemo(String content) {
-        log.info("[AI 클라이언트] FastAPI 파싱 요청 전송: content='{}'", content);
+    public MemoAiParseResponse parseMemo(Long memoId, Long memberId, String content) {
+        log.info("[AI 클라이언트] FastAPI 파싱 요청 전송: memoId={}, memberId={}, content='{}'", memoId, memberId, content);
 
         return restClient.post()
                 .uri("/api/v1/ai/parse-memo")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(new MemoAiParseRequest(content))
+                .body(new MemoAiParseRequest(memoId, memberId, content))
                 .retrieve()
                 .body(MemoAiParseResponse.class);
     }
