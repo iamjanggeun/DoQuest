@@ -29,7 +29,11 @@ public enum ErrorCode {
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "해당 회원의 펫을 찾을 수 없습니다."),
 
     // Auth & Security
-    INVALID_LOGIN_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A001", "이메일 또는 비밀번호가 올바르지 않습니다.");
+    INVALID_LOGIN_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A001", "이메일 또는 비밀번호가 올바르지 않습니다."),
+
+    // Schedule
+    SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "존재하지 않는 일정입니다."),
+    INVALID_SCHEDULE_DATE(HttpStatus.BAD_REQUEST, "S002", "유효하지 않은 일정 날짜 형식입니다.");
 
     private final HttpStatus status;
     private final String code;
