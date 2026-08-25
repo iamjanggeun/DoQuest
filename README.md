@@ -15,7 +15,7 @@
 | 2026.08.21 | v0.7.1 | Spring Event 기반 비동기 AI 파이프라인 구축 및 E2E 검증 | Janggeun |
 | 2026.08.24 | v0.8.0 | FastAPI 프롬프트 강화 및 KST(Asia/Seoul) 추가 | Janggeun |
 | 2026.08.24 | v0.8.1 | Spring <-> FastAPI 간 DTO / Schemas 불일치 수정 | Janggeun |
-|| 2026.08.25 | v0.9.0 | • **Schedule 도메인 구축**: 캘린더 기능 추가<br>• **복합 인덱스 기반 D-3 큐레이션 최적화**: LLM 반복 호출 없이 `idx_schedules_member_date` 복합 인덱스 쿼리로 마감 3일 이내 데이터 즉시 필터링<br>• **Two-Phase Commit UX 지원**: 비정형 메모 파싱 후 즉시 저장하지 않고, 유저 확인을 거쳐 `ScheduleCreateRequest`로 영속화 | Janggeun |
+| 2026.08.25 | v0.9.0 | • **Schedule 도메인 구축**: 캘린더 기능 추가<br>• **복합 인덱스 기반 D-3 큐레이션 최적화**: LLM 반복 호출 없이 `idx_schedules_member_date` 복합 인덱스 쿼리로 마감 3일 이내 데이터 즉시 필터링<br>• **Two-Phase Commit UX 지원**: 비정형 메모 파싱 후 즉시 저장하지 않고, 유저 확인을 거쳐 `ScheduleCreateRequest`로 영속화 | Janggeun |
 
 ---
 
