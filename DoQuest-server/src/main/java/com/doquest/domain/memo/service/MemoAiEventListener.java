@@ -35,7 +35,7 @@ public class MemoAiEventListener {
 
         try {
             // FastAPI AI 엔진 호출 (LangChain + LLM 추론)
-            AiParserDto.Response response = aiClient.parseMemo(event.memberId(), event.content());
+            AiParserDto.Response response = aiClient.parseMemo(event.memoId(), event.memberId(), event.content());
 
             log.info("[AI 파싱 성공] memoId={}, isSchedule={}, title='{}', links={}",
                     event.memoId(), response.isSchedule(), response.title(),

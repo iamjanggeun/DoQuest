@@ -45,13 +45,13 @@ class MemoAiEventListenerTest {
                 List.of("https://github.com/study") // actionLinks
         );
 
-        given(aiClient.parseMemo(1L, "내일 2시 알고리즘 스터디")).willReturn(mockResponse);
+        given(aiClient.parseMemo(100L, 1L, "내일 2시 알고리즘 스터디")).willReturn(mockResponse);
 
         // when
         memoAiEventListener.handleMemoCreated(event);
 
         // then
-        verify(aiClient).parseMemo(1L, "내일 2시 알고리즘 스터디");
+        verify(aiClient).parseMemo(100L, 1L, "내일 2시 알고리즘 스터디");
         verify(memoService).completeParsing(100L);
     }
 
@@ -60,14 +60,14 @@ class MemoAiEventListenerTest {
     void handleMemoCreated_AI서버장애_내결함성_격리() {
         // given
         MemoCreatedEvent event = new MemoCreatedEvent(100L, 1L, "장애 테스트 메모");
-        given(aiClient.parseMemo(1L, "장애 테스트 메모"))
+        given(aiClient.parseMemo(100L, 1L,"장애 테스트 메모"))
                 .willThrow(new HttpServerErrorException(HttpStatusCode.valueOf(500), "FastAPI Server Down"));
 
         // when
         memoAiEventListener.handleMemoCreated(event);
 
         // then
-        verify(aiClient).parseMemo(1L, "장애 테스트 메모");
+        verify(aiClient).parseMemo(100L, 1L ,"장애 테스트 메모");
         // 장애 시 파싱 완료 플래그 처리는 호출되지 않음
         verify(memoService, never()).completeParsing(anyLong());
     }

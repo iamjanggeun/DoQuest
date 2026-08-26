@@ -69,11 +69,12 @@ class AiClientTest {
             mockServer.expect(requestTo("http://localhost:8000/api/v1/ai/parse-memo"))
                     .andExpect(method(HttpMethod.POST))
                     .andExpect(header("Content-Type", MediaType.APPLICATION_JSON_VALUE))
-                    .andExpect(jsonPath("$.member_id").value(1L))
+                    .andExpect(jsonPath("$.memo_id").value(1L))
+                    .andExpect(jsonPath("$.member_id").value(2L))
                     .andExpect(jsonPath("$.content").value("내일 저녁 백준 DP 문제 풀기"))
                     .andRespond(withSuccess(mockResponseJson, MediaType.APPLICATION_JSON));
 
-            AiParserDto.Response response = aiClient.parseMemo(1L, "내일 저녁 백준 DP 문제 풀기");
+            AiParserDto.Response response = aiClient.parseMemo(1L, 2L, "내일 저녁 백준 DP 문제 풀기");
 
             assertThat(response).isNotNull();
             assertThat(response.isSchedule()).isTrue();
@@ -93,7 +94,7 @@ class AiClientTest {
                     .andExpect(method(HttpMethod.POST))
                     .andRespond(withServerError());
 
-            assertThatThrownBy(() -> aiClient.parseMemo(1L, "내일 회의"))
+            assertThatThrownBy(() -> aiClient.parseMemo(1L, 2L, "내일 회의"))
                     .isInstanceOf(HttpServerErrorException.class);
 
             mockServer.verify();
