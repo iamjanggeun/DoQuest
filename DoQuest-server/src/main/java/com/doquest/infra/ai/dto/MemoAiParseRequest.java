@@ -1,8 +1,10 @@
 package com.doquest.infra.ai.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public record MemoAiParseRequest(
-        Long memoId,
-        Long memberId,
-        String content
+        @JsonProperty("memo_id") Long memoId,
+        @JsonProperty("member_id") Long memberId,
+        @JsonProperty("content") String content
 ) {
 }
