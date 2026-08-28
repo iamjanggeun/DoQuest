@@ -36,4 +36,4 @@ ai:
   service:
     base-url: http://localhost:8000
     connect-timeout-ms: 3000
-    read-timeout-ms: 60000 # LLM I/O 지연 대비 타임아웃 10초 설정
+    read-timeout-ms: 60000 # LLM I/O 지연 대비 타임아웃 60초 설정
