@@ -28,6 +28,34 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 
 자세한 실험 조건과 원시 측정값은 [동기·비동기 성능 및 장애 격리 검증](docs/ai-async-benchmark.md)에 기록했습니다.
 
+### Two-Phase HTTP E2E 결과
+
+2026-08-28 로컬 H2 환경에서 Spring Boot, FastAPI, OpenAI를 실제로 연결해 다음 흐름을 검증했습니다.
+
+```text
+Memo 생성(201)
+→ MemoAnalysis(PENDING)
+→ AI 분석 완료(SUCCEEDED)
+→ 사용자 확정(201)
+→ MemoAnalysis(CONFIRMED)
+→ 월간 Schedule 조회 반영
+```
+
+| 검증 항목 | 실제 결과 |
+|---|---|
+| FastAPI 상태 | `200 OK` |
+| Memo 생성 | `201 Created`, memoId `1` |
+| 분석 상태 전이 | `PENDING → PENDING → SUCCEEDED` |
+| AI 추출 결과 | `2026-08-30`, 장소 `선릉` |
+| Memo 파싱 상태 | `isParsed=true` |
+| 사용자 확정 | `201 Created`, scheduleId `1` |
+| 최종 분석 상태 | `CONFIRMED` |
+| 월간 캘린더 조회 | 동일 memoId의 Schedule 1건 |
+| 중복 확정 | `409 Conflict / MA003` |
+| 확정 Memo 삭제 | `409 Conflict / MA004` |
+
+자동 테스트뿐 아니라 실제 HTTP 요청에서도 AI 제안이 사용자 확인 전에는 Schedule로 저장되지 않고, 확정 이후 정확히 한 번만 등록되는 것을 확인했습니다. 상세 요청·응답과 추가 장애 시나리오는 [Two-Phase E2E 테스트 결과](docs/two-phase-e2e-test-results.md)에 기록했습니다.
+
 ## 아키텍처
 
 ```mermaid
@@ -278,6 +306,7 @@ cd DoQuest-server
 | 2026.08.20 | `AFTER_COMMIT + @Async` AI 파이프라인 구축 |
 | 2026.08.25 | Schedule 도메인과 D-3 조회 구현 |
 | 2026.08.28 | 성능·장애 실험 및 Two-Phase 분석 확정 흐름 구현 |
+| 2026.08.28 | Two-Phase 정상 흐름·중복 확정·확정 Memo 삭제 HTTP E2E 검증 |
 
 </details>
 

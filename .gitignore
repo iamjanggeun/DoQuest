@@ -19,6 +19,9 @@ venv/
 ENV/
 .env
 
+# Local E2E credentials and temporary files
+private/
+
 ### OS 파일 ###
 .DS_Store
 Thumbs.db
