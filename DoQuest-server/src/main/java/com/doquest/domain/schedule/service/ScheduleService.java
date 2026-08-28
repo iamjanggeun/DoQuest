@@ -33,7 +33,8 @@ public class ScheduleService {
 
         Memo memo = null;
         if (request.memoId() != null) {
-            memo = memoRepository.findById(request.memoId()).orElse(null);
+            memo = memoRepository.findByIdAndMemberId(request.memoId(), memberId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
         }
 
         Schedule schedule = Schedule.createSchedule(

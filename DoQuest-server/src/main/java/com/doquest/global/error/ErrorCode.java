@@ -31,6 +31,12 @@ public enum ErrorCode {
     // Auth & Security
     INVALID_LOGIN_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A001", "이메일 또는 비밀번호가 올바르지 않습니다."),
 
+    // Memo AI Analysis
+    MEMO_ANALYSIS_NOT_FOUND(HttpStatus.NOT_FOUND, "MA001", "메모 분석 결과를 찾을 수 없습니다."),
+    MEMO_ANALYSIS_NOT_CONFIRMABLE(HttpStatus.CONFLICT, "MA002", "확정할 수 있는 일정 분석 결과가 아닙니다."),
+    MEMO_ANALYSIS_ALREADY_CONFIRMED(HttpStatus.CONFLICT, "MA003", "이미 일정으로 등록된 분석 결과입니다."),
+    MEMO_HAS_CONFIRMED_SCHEDULE(HttpStatus.CONFLICT, "MA004", "등록된 일정과 연결된 메모는 삭제할 수 없습니다."),
+
     // Schedule
     SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "존재하지 않는 일정입니다."),
     INVALID_SCHEDULE_DATE(HttpStatus.BAD_REQUEST, "S002", "유효하지 않은 일정 날짜 형식입니다.");

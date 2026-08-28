@@ -6,6 +6,7 @@ import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.event.MemoCreatedEvent;
 import com.doquest.domain.memo.repository.MemoRepository;
+import com.doquest.domain.memo.repository.MemoAnalysisRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,9 @@ class MemoServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
+    private MemoAnalysisRepository memoAnalysisRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher; // 👈 비동기 이벤트 발행 검증용 Mock 주입
 
     @Test
@@ -62,6 +66,7 @@ class MemoServiceTest {
         assertThat(savedId).isEqualTo(100L);
         assertThat(memo.isParsed()).isFalse();
         verify(memoRepository).save(any(Memo.class));
+        verify(memoAnalysisRepository).save(any(com.doquest.domain.memo.entity.MemoAnalysis.class));
 
         // 👈 도메인 이벤트(MemoCreatedEvent)가 정상 발행되었는지 검증
         verify(eventPublisher).publishEvent(any(MemoCreatedEvent.class));

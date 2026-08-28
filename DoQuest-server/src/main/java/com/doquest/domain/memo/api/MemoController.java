@@ -1,9 +1,12 @@
 package com.doquest.domain.memo.api;
 
 import com.doquest.domain.memo.dto.MemoCreateRequest;
+import com.doquest.domain.memo.dto.MemoAnalysisResponse;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.dto.MemoUpdateRequest;
 import com.doquest.domain.memo.service.MemoService;
+import com.doquest.domain.memo.service.MemoAnalysisService;
+import com.doquest.domain.schedule.dto.ScheduleResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +22,7 @@ import java.util.List;
 public class MemoController {
 
     private final MemoService memoService;
+    private final MemoAnalysisService memoAnalysisService;
 
     /**
      * 메모 생성 (201 Created -> 생성된 memoId 반환)
@@ -41,6 +45,21 @@ public class MemoController {
 
         List<MemoResponse> responses = memoService.getMemosByMemberId(memberId);
         return ResponseEntity.ok(responses);
+    }
+
+    @GetMapping("/{memoId}/analysis")
+    public ResponseEntity<MemoAnalysisResponse> getMemoAnalysis(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long memoId) {
+        return ResponseEntity.ok(memoAnalysisService.getAnalysis(memberId, memoId));
+    }
+
+    @PostMapping("/{memoId}/analysis/confirm")
+    public ResponseEntity<ScheduleResponse> confirmMemoAnalysis(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long memoId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(memoAnalysisService.confirmSchedule(memberId, memoId));
     }
 
     /**

@@ -75,7 +75,7 @@ class ScheduleServiceTest {
             ReflectionTestUtils.setField(savedSchedule, "id", 100L);
 
             given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
-            given(memoRepository.findById(memoId)).willReturn(Optional.of(memo));
+            given(memoRepository.findByIdAndMemberId(memoId, memberId)).willReturn(Optional.of(memo));
             given(scheduleRepository.save(any(Schedule.class))).willReturn(savedSchedule);
 
             // when

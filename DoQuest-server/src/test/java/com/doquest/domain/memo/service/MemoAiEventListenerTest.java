@@ -29,7 +29,7 @@ class MemoAiEventListenerTest {
     private AiClient aiClient;
 
     @Mock
-    private MemoService memoService;
+    private MemoAnalysisService memoAnalysisService;
 
     @Test
     @DisplayName("AI 파싱 성공 시 MemoService.completeParsing()을 호출한다")
@@ -52,7 +52,7 @@ class MemoAiEventListenerTest {
 
         // then
         verify(aiClient).parseMemo(100L, 1L, "내일 2시 알고리즘 스터디");
-        verify(memoService).completeParsing(100L);
+        verify(memoAnalysisService).completeAnalysis(100L, mockResponse);
     }
 
     @Test
@@ -69,6 +69,7 @@ class MemoAiEventListenerTest {
         // then
         verify(aiClient).parseMemo(100L, 1L ,"장애 테스트 메모");
         // 장애 시 파싱 완료 플래그 처리는 호출되지 않음
-        verify(memoService, never()).completeParsing(anyLong());
+        verify(memoAnalysisService, never()).completeAnalysis(anyLong(), any());
+        verify(memoAnalysisService).failAnalysis(100L);
     }
 }

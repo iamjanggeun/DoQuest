@@ -1,184 +1,286 @@
-# Revision History
+# DoQuest
 
-| 개정일자 | 버전 | 주요 변경 및 반영 내용 | 작성자 |
-| :--- | :--- | :--- | :--- |
-| 2026.08.08 | v0.1.0 | Initial Project Setup & Domain Entity Design (Member, Pet, Quest) | Janggeun |
-| 2026.08.09 | v0.2.0 | Dashboard Aggregator API (`DashboardController`, `DashboardResponse`) 설계 | Janggeun |
-| 2026.08.10 | v0.3.0 | 펫 경험치 어뷰징 방지 가드레일(`QuestStatus`, `startedAt` 30분 타이머) 구축 및 단방향 1:1 영속성 전이 최적화 | Janggeun |
-| 2026.08.12 | v0.4.0 | Memo 도메인 CRUD API 및 Java 17 `record` 기반 DTO/응답 스펙 설계 | Janggeun |
-| 2026.08.13 | v0.4.1 | `@WebMvcTest` 슬라이스 테스트 환경 구축 및 `MethodArgumentNotValidException` 핸들링을 통한 HTTP 예외 응답 정합성(400 vs 500) 교정 (`JpaConfig` 분리) | Janggeun |
-| 2026.08.14 | v0.5.0 | Spring Security 6.x + JJWT 기반 Stateless 인증 인프라 구축 (`JwtProvider`, `JwtAuthenticationFilter`, `application-secret.yml` 환경 격리) | Janggeun |
-| 2026.08.17 | v0.5.1 | Memo 도메인 계층 격리(Service DTO 반환) 및 `@AuthenticationPrincipal` 전환, 테스트 표준화(`@MockitoBean`) | Janggeun |
-| 2026.08.18 | v0.6.0 | FastAPI + LangChain LCEL 기반 비동기 AI 서빙 엔진(doquest-ai) 구축 및 어댑터 패턴 기반 슬라이스 테스트(pytest) 작성 | Janggeun |
-| 2026.08.19 | v0.6.1 | Spring 6 RestClient 통신 계층 구현 및 MockRestServiceServer 바인딩 트러블슈팅을 통한 외부 의존성 0% 슬라이스 테스트(AiClientTest) 완성 | Janggeun |
-| 2026.08.20 | v0.7.0 | Spring Event 기반 비동기 AI 파이프라인 구축 (AsyncConfig 전용 스레드 풀 격리, @TransactionalEventListener(AFTER_COMMIT) 및 내결함성 단위 검증 완료) | Janggeun |
-| 2026.08.21 | v0.7.1 | Spring Event 기반 비동기 AI 파이프라인 구축 및 E2E 검증 | Janggeun |
-| 2026.08.24 | v0.8.0 | FastAPI 프롬프트 강화 및 KST(Asia/Seoul) 추가 | Janggeun |
-| 2026.08.24 | v0.8.1 | Spring <-> FastAPI 간 DTO / Schemas 불일치 수정 | Janggeun |
-| 2026.08.25 | v0.9.0 | • **Schedule 도메인 구축**: 캘린더 기능 추가<br>• **복합 인덱스 기반 D-3 큐레이션 최적화**: LLM 반복 호출 없이 `idx_schedules_member_date` 복합 인덱스 쿼리로 마감 3일 이내 데이터 즉시 필터링<br>• **Two-Phase Commit UX 지원**: 비정형 메모 파싱 후 즉시 저장하지 않고, 유저 확인을 거쳐 `ScheduleCreateRequest`로 영속화 | Janggeun |
+> 오늘의 메모가 내일의 퀘스트가 되는 AI 기반 생산성 플랫폼
 
----
+DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출하고, 사용자 확인을 거쳐 캘린더 일정으로 전환하는 백엔드 프로젝트입니다. 퀘스트 수행과 펫 성장이라는 게이미피케이션을 결합해 기록에서 실행까지 이어지는 경험을 목표로 합니다.
 
-# DoQuest (AI 기반 생산성 & 게이미피케이션 습관 형성 서비스)
+이 프로젝트에서는 기능 수를 늘리는 것보다 다음 문제를 코드와 실험으로 검증하는 데 집중했습니다.
 
-> **"오늘의 메모가 내일의 퀘스트가 되는 개인화 생산성 플랫폼"**  
-> DoQuest는 단순한 To-Do 리스트를 넘어, 메모 작성만으로 AI가 일정을 자동 추출하고 게이미피케이션(펫 성장) 요소를 결합하여 사용자의 지속적인 동기부여를 이끌어내는 백엔드 서비스입니다.
+- 외부 LLM 호출이 핵심 메모 저장 트랜잭션을 지연시키거나 롤백시키지 않도록 격리
+- AI 분석 결과를 즉시 영속화하지 않고 사용자가 확인한 뒤 일정으로 등록하는 Two-Phase UX
+- JWT의 회원 식별자를 기준으로 모든 도메인 데이터의 소유권 검증
+- 반복되는 일정 추천에 LLM을 사용하지 않고 인덱스 기반 쿼리로 처리
+- 단위·슬라이스·트랜잭션 통합·실제 장애 실험을 통한 설계 근거 확보
 
----
+## 핵심 성과
 
-## Tech Stack
+| 주제 | 구현 및 검증 결과 |
+|---|---|
+| 응답 지연 격리 | 평균 HTTP 응답 시간 `1,761.55ms → 9.46ms`, 약 `99.46%` 감소 |
+| 트랜잭션 경계 | `AFTER_COMMIT` 이후에만 AI 작업을 실행해 롤백된 Memo의 AI 호출 방지 |
+| 장애 격리 | FastAPI 종료 상태에서도 Memo 생성 `201 Created`, row 유지, `isParsed=false` 확인 |
+| Two-Phase UX | AI 분석을 `PENDING → SUCCEEDED/FAILED → CONFIRMED` 상태로 관리하고 사용자 확정 후 Schedule 생성 |
+| 중복 확정 방지 | 상태 검증과 낙관적 잠금으로 동일 분석 결과의 Schedule 중복 생성 방어 |
+| 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
+| 테스트 | Spring 전체 `47 tests`, 실패 `0`, 오류 `0` |
 
-- **Backend:** Java 17, Spring Boot 3.x, Spring Data JPA
-- **Database:** MySQL 8.0, Redis (예정)
-- **AI Engine (Phase 4 예정):** Python, FastAPI, LangChain, Vector DB (Chroma/pgvector)
-- **Testing & Tools:** JUnit5, AssertJ, Mockito, Postman, Git/GitHub
+성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
----
+자세한 실험 조건과 원시 측정값은 [동기·비동기 성능 및 장애 격리 검증](docs/ai-async-benchmark.md)에 기록했습니다.
 
-## Architecture & Core Design Principles
+## 아키텍처
 
-### 1. BFF (Backend For Frontend) / Aggregator Pattern
-- **네트워크 Latency 및 Round-Trip 최적화:** 1번 대시보드 화면 진입 시, 펫 정보(`Pet`)와 미완료 퀘스트 목록(`Quest`)을 각각 분리된 API로 요청하지 않고 `DashboardController`에서 통합 조회하여 하나의 `DashboardResponse` DTO로 묶어 제공합니다.
+```mermaid
+flowchart LR
+    Client[Client / Web UI]
+    Spring[Spring Boot]
+    H2[(H2 Database)]
+    Event[AFTER_COMMIT Event]
+    Worker[aiTaskExecutor]
+    FastAPI[FastAPI / LangChain]
+    OpenAI[OpenAI API]
 
-### 2. 도메인 주도 설계 (DDD) & 계층 간 책임 분리
-- **신뢰 경계 (Trust Boundary) 구축:** 퀘스트 생성 시 보상 경험치(`rewardExp`)를 클라이언트 요청(Request DTO)으로 받지 않고, 오직 서버 비즈니스 레이어(`QuestService`)에서 상수로 관리 및 주입하여 데이터 위변조(어뷰징)를 원천 차단했습니다.
-- **Single Source of Truth:** `boolean isCompleted` 플래그 대신 `QuestStatus` Enum (`IN_PROGRESS`, `COMPLETED`)으로 상태 관리를 일원화하여 데이터 불일치를 방지했습니다.
+    Client -->|JWT REST API| Spring
+    Spring -->|Memo commit| H2
+    Spring --> Event
+    Event --> Worker
+    Worker -->|RestClient| FastAPI
+    FastAPI --> OpenAI
+    OpenAI --> FastAPI
+    FastAPI -->|ScheduleMetadata| Worker
+    Worker -->|MemoAnalysis update| H2
+```
 
----
-
-## Key Abusing Guardrails (어뷰징 방지 가드레일)
-
-### 30분 최소 수행 시간 타임스탬프 가드레일 (Rate Limiting)
-* **문제 정의:** 유저가 펫 경험치를 빠르게 올리기 위해 퀘스트 생성 직후 1초 만에 완료 버튼을 연속 연타하는 경험치 어뷰징 위험성 존재.
-* **시행착오 & UX 개선:** 
-  - *초기 안:* 퀘스트 생성 자체에 1분 쿨타임을 두려 했으나, 당일 할 일을 한꺼번에 등록하는 실제 사용자의 UX를 심각하게 저해함을 인지.
-  - *개선 안:* **등록과 수행 이벤트의 분리.** 퀘스트 생성 시점(`startedAt = LocalDateTime.now()`)을 기록하고, **완료 처리 시 `startedAt` 기준 최소 30분이 지난 경우에만 완료 승인 및 경험치를 지급**하도록 도메인 가드레일(`validateCompleteCooldown`) 구축.
-
----
-
-## Performance Optimization & Indexing
-
-### 1. 복합 인덱스 (`Composite Index`) 적용
-- **조회 패턴:** 대시보드 진입 시 `WHERE member_id = ? AND status = 'IN_PROGRESS'` 조건의 조회가 빈번히 발생함.
-- **최적화:** `@Index(name = "idx_quests_member_status", columnList = "member_id, status")` 복합 인덱스를 생성하여 테이블 풀 스캔(Full Scan)을 방지하고 B-Tree 인덱스 스캔 효율 극대화.
-
-### 2. 읽기 전용 트랜잭션 최적화
-- `PetService`, `QuestService` 내 단건/목록 조회 메서드에 `@Transactional(readOnly = true)`를 선언하여 영속성 컨텍스트의 스냅샷 보관 비용 및 플러시(Flush) 오버헤드를 제거하여 CUD 대비 조회 성능 향상.
-
----
-
-## Testing Strategy
-
-- **Domain Unit Test (`QuestTest`, `PetTest`):** Mocking 없이 팩토리 메서드 및 상태 변이 비즈니스 로직의 순수 자바 단위 검증.
-- **Service Layer Test (`QuestServiceTest`, `PetServiceTest`):** Mockito 기반의 계층 격리 테스트.
-  - `ReflectionTestUtils`를 활용해 H2/DB 인프라 연결 없이 `startedAt` 시각을 35분 전으로 가상 조작하여 30분 쿨타임 가드레일의 경계값(Edge Case) 및 타인 퀘스트 완료 시도(보안 예외)를 1초 미만의 속도로 고속 검증.
-
----
-
-## Troubleshooting & Engineering Decisions
-
-<details>
-<summary><b>1. Member와 Pet 간의 1:1 단방향 매핑 및 순환 참조(닭과 달걀) 해결</b></summary>
-
-- **문제:** `Member`와 `Pet`을 양방향 1:1로 매핑할 경우, 생성 시점에 "누구를 먼저 save 해야 하는가"에 대한 순환 의존성이 발생.
-- **해결:** `Pet`은 `Member`의 존재를 모르는 순수 독립 도메인(`createDefaultPet`)으로 설계하고, `Member`가 `pet_id` FK 및 영속성 전이(`CascadeType.PERSIST`)를 단독 관리하는 **단방향 1:1 매핑**으로 결합도를 축소.
-</details>
-
-<details>
-<summary><b>2. OCP(개방-폐쇄 원칙)를 고려한 퀘스트 보상 경험치 설계</b></summary>
-
-- **문제:** 현재는 퀘스트 완료 시 20 EXP 고정 지급이지만, 향후 Phase 4에서 **'AI 기반 난이도 동적 측정'**이 들어올 예정.
-- **해결:** `Quest.createQuest` 팩토리 메서드가 보상치를 파라미터로 주입받도록 설계하여, 향후 AI RAG 파이프라인 연동 시 엔티티 코드 수정 없이 `QuestService` 로직 변경만으로 유연하게 확장 가능하도록 OCP 준수.
-</details>
-
-<details>
-<summary><b>3. @WebMvcTest 기반 슬라이스 테스트를 통한 입력 검증 예외(400 vs 500) 조기 발견 및 교정</b></summary>
-
-- **문제 상황 (Problem):**
-  - 메모 생성 API(`POST /api/v1/memos`) 개발 후 `@Valid` 검증 실패(공백 문자열 입력) 테스트 작성 중, 예상했던 `400 Bad Request` 대신 `500 Internal Server Error`가 반환되는 현상 발견.
-- **원인 분석 (Root Cause):**
-  - Spring MVC는 DTO 유효성 검증 실패 시 `MethodArgumentNotValidException`을 발생시킴.
-  - 전역 예외 처리기(`GlobalExceptionHandler`)에 해당 예외 전용 핸들러가 누락되어 최상위 `Exception.class` 핸들러로 인계되었고, 이로 인해 서버 내부 오류(500)로 오인 응답됨.
-- **해결 방안 (Action):**
-  - `@RestControllerAdvice`에 `MethodArgumentNotValidException` 전용 `@ExceptionHandler`를 선언하고, `ErrorCode.INVALID_INPUT_VALUE`와 함께 HTTP `400 Bad Request` 상태 코드를 명시하도록 정합성 교정.
-  - `@EnableJpaAuditing`을 메인 클래스에서 독립 `JpaConfig`로 분리하여 웹 슬라이스 테스트(`@WebMvcTest`) 컨텍스트 격리성 확보.
-- **성과 및 이점 (Result):**
-  - 실제 서버를 실행하거나 E2E 테스트를 거치지 않고 **0.5초 만에 수행되는 `@WebMvcTest` 슬라이스 테스트 환경에서 API 응답 규격 결함을 조기에 발견(Shift-Left)**하여 배포 전 리스크 최소화.
-</details>
-
-<details>
-<summary><b>4. 계층 간 결합도 축소를 위한 DTO 반환 리팩토링 및 테스트 코드 동기화</b></summary>
-
-- **문제 상황 (Problem):**
-  - `MemoService`가 영속성 엔티티(`Memo`)를 Presentation 계층(Controller)으로 직접 반환하고 있어 도메인 계층과 웹 계층 간 강한 결합(Tight Coupling)이 발생.
-  - Spring Security 적용 및 API 응답 스펙을 명확히 하기 위해 Service 반환 타입을 DTO(`MemoResponse`)로 전환하는 과정에서, 기존 단위/슬라이스 테스트(`MemoServiceTest`, `MemoControllerTest`)에 타입 불일치 컴파일 에러 및 스펙 불일치 테스트 실패 다수 발생.
-- **원인 분석 (Root Cause):**
-  - 엔티티의 변경이 Presentation 계층의 JSON 응답 스펙에 즉각적인 영향을 주는 구조였음.
-  - 기존 테스트 코드 내 Mocking Stubbing(`willReturn`) 및 단언(Assertion) 로직이 엔티티 인스턴스에 강하게 의존하고 있어, 반환 타입 변경 시 테스트 코드가 연쇄적으로 깨짐.
-- **해결 방안 (Action):**
-  - `MemoResponse` Record 내부에 정적 팩토리 메서드(`from(Memo memo)`)를 구현하여 엔티티 to DTO 변환 책임을 캡슐화.
-  - `MemoService` 내부에서 DTO 변환을 완료하여 Controller로 전달하도록 계층 간 역할을 명확히 분리.
-  - `MemoRepository`의 최신순 정렬 메서드(`findByMemberIdOrderByCreatedAtDesc`) 호출부와 Service 로직의 정합성을 동기화.
-  - `MemoServiceTest`의 검증 대상을 DTO 필드 단언으로 수정하고, Spring Boot 최신 테스트 표준인 `@MockitoBean`을 적용하여 전체 테스트 성공
-- **성과 및 이점 (Result):**
-  - 도메인 엔티티의 내부 구현 변경이 외부 API 스펙(DTO)으로 전파되지 않도록 계층 간 독립성 확보.
-  - 계층 분리 리팩토링 과정에서 단위/슬라이스 테스트를 함께 동기화하여 변경에 안전한 테스트 코드베이스 구축.
+### 메모 생성과 AI 후처리
 
 ```text
-  [기존 (As-Is)]
-  DB ──▶ MemoRepository ──▶ MemoService (List<Memo> 반환) ──▶ MemoController (DTO 변환) ──▶ Client
-
-  [개선 (To-Be)]
-  DB ──▶ MemoRepository ──▶ MemoService (List<MemoResponse> DTO 변환) ──▶ MemoController ──▶ Client
+Transaction A
+Memo 저장 + MemoAnalysis(PENDING) 생성
+COMMIT
+    ↓
+@TransactionalEventListener(AFTER_COMMIT)
+    ↓
+@Async("aiTaskExecutor")
+    ↓
+FastAPI → LangChain LCEL → OpenAI Structured Output
+    ↓
+Transaction B (REQUIRES_NEW)
+MemoAnalysis(SUCCEEDED/FAILED) + Memo.isParsed 갱신
 ```
+
+- `AFTER_COMMIT`: Memo 저장이 성공한 경우에만 AI 파이프라인 실행
+- `@Async`: 외부 LLM I/O를 HTTP 요청 스레드에서 분리
+- `REQUIRES_NEW`: AI 분석 결과를 독립 트랜잭션으로 반영
+- AI 장애 시 Memo 원본은 유지되지만 현재 자동 retry/outbox/DLQ는 제공하지 않음
+
+### Two-Phase 일정 등록
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Memo 생성
+    PENDING --> SUCCEEDED: AI 분석 성공
+    PENDING --> FAILED: AI 호출 또는 분석 실패
+    SUCCEEDED --> CONFIRMED: 사용자 일정 등록 확정
+    CONFIRMED --> [*]: Schedule 생성
+```
+
+AI가 판단한 결과를 곧바로 Schedule로 저장하지 않습니다. 프론트엔드는 분석 결과를 조회한 뒤 사용자의 명시적 확정을 받아 Schedule을 생성합니다.
+
+```http
+GET  /api/v1/memos/{memoId}/analysis
+POST /api/v1/memos/{memoId}/analysis/confirm
+```
+
+확정 과정에서는 다음을 검증합니다.
+
+- JWT 회원과 Memo 소유자가 일치하는가
+- 분석 상태가 `SUCCEEDED`인가
+- 실제 일정 후보이며 날짜가 존재하는가
+- 이미 `CONFIRMED`된 결과가 아닌가
+- 동시에 확정 요청이 들어와도 한 건만 생성되는가
+
+## 주요 도메인
+
+### Memo / MemoAnalysis / Schedule
+
+- Memo 원문과 AI 분석 결과, 확정된 Schedule을 분리해 각 도메인의 책임을 명확히 유지
+- AI 응답 계약: `is_schedule`, `title`, `scheduled_at`, `location`, `summary_info`, `action_links`
+- KST 기준 Temporal Grounding은 FastAPI에서 처리하고 Spring은 `LocalDate`로 검증·변환
+- 수동 일정과 Memo 기반 일정 생성 지원
+- 월별 일정 및 D-3 미완료 일정 조회 지원
+
+### Quest / Pet
+
+- 퀘스트 보상 경험치를 클라이언트 입력에서 제외하고 서버 정책으로 관리
+- `QuestStatus`를 상태의 단일 진실 공급원으로 사용
+- 생성 직후 반복 완료로 경험치를 획득하지 못하도록 최소 30분 수행 시간 검증
+- Member가 Pet의 생명주기를 관리하는 단방향 1:1 매핑으로 순환 의존 제거
+
+### Dashboard
+
+- Pet 상태와 진행 중 Quest를 하나의 `DashboardResponse`로 묶는 BFF/Aggregator API 제공
+- 화면 진입 시 여러 API를 호출하는 대신 한 번의 요청으로 필요한 데이터 반환
+
+## 기술 스택
+
+| 영역 | 기술 |
+|---|---|
+| Backend | Java 17, Spring Boot 3.5.16, Spring MVC |
+| Persistence | Spring Data JPA, Hibernate |
+| Security | Spring Security 6, JJWT, Stateless JWT |
+| Async / Integration | Spring Event, `@Async`, RestClient |
+| Local Database | H2 In-Memory, MySQL compatibility mode |
+| AI Service | FastAPI, LangChain LCEL, OpenAI Structured Output |
+| Testing | JUnit 5, AssertJ, Mockito, MockMvc, MockRestServiceServer |
+
+현재 H2로 개발·검증 중이며 운영 DB는 아직 선정·연동하지 않았습니다. 운영 DB 선정 후 Flyway 또는 Liquibase 기반 마이그레이션과 실제 DB 통합 테스트를 추가할 예정입니다.
+
+## API 요약
+
+모든 인증 필요 API는 `Authorization: Bearer <access-token>` 헤더를 사용합니다.
+
+| 도메인 | Method | Endpoint | 설명 |
+|---|---|---|---|
+| Auth | POST | `/api/v1/auth/signup` | 회원가입 |
+| Auth | POST | `/api/v1/auth/login` | 로그인 및 JWT 발급 |
+| Dashboard | GET | `/api/v1/dashboard` | Pet + 진행 중 Quest 통합 조회 |
+| Memo | POST | `/api/v1/memos` | Memo 생성 및 비동기 AI 분석 시작 |
+| Memo | GET | `/api/v1/memos` | 회원의 Memo 목록 조회 |
+| Memo | PATCH | `/api/v1/memos/{memoId}` | Memo 수정 |
+| Memo | DELETE | `/api/v1/memos/{memoId}` | Memo 삭제 |
+| Analysis | GET | `/api/v1/memos/{memoId}/analysis` | AI 분석 상태와 결과 조회 |
+| Analysis | POST | `/api/v1/memos/{memoId}/analysis/confirm` | 분석 결과를 Schedule로 확정 |
+| Quest | POST | `/api/v1/quests` | Quest 생성 |
+| Schedule | POST | `/api/v1/schedules` | 수동/컨펌 Schedule 생성 |
+| Schedule | GET | `/api/v1/schedules?year=2026&month=8` | 회원의 월별 Schedule 조회 |
+| Schedule | GET | `/api/v1/schedules/curations` | D-3 미완료 Schedule 조회 |
+| Schedule | DELETE | `/api/v1/schedules/{scheduleId}` | Schedule 삭제 |
+
+## 테스트 전략
+
+| 계층 | 검증 대상 |
+|---|---|
+| Domain Unit | 팩토리 메서드, 상태 전이, 30분 수행 가드레일 |
+| Service Unit | 회원 소유권, 분석 상태 전이, 중복 확정, DTO 변환 |
+| MVC Slice | 요청 검증, 상태 코드, JSON 응답 계약 |
+| RestClient Slice | 실제 FastAPI 연결 없이 요청·응답 DTO 계약 검증 |
+| Transaction Integration | commit/rollback에 따른 `AFTER_COMMIT` 실행 여부 검증 |
+| Failure E2E | FastAPI 프로세스 종료 시 Memo 보존과 장애 범위 확인 |
+
+```bash
+cd DoQuest-server
+./gradlew test
+```
+
+현재 검증 결과:
+
+```text
+47 tests completed
+0 failures
+0 errors
+```
+
+## 실행 방법
+
+### 1. 요구사항
+
+- Java 17
+- FastAPI AI 서버: `http://localhost:8000`
+
+### 2. 로컬 설정
+
+JWT 비밀키는 저장소에 커밋하지 않고 환경별 비밀 설정으로 관리합니다. 다음 값이 필요합니다.
+
+```yaml
+jwt:
+  secret: replace-with-at-least-32-byte-secret
+  access-token-expiration: 3600000
+```
+
+AI 서버 주소와 제한 시간은 `application.yml`의 `ai.service`에서 설정합니다.
+
+### 3. Spring 실행
+
+```bash
+cd DoQuest-server
+./gradlew bootRun
+```
+
+로컬 프로필은 H2 In-Memory DB를 사용합니다.
+
+## 트러블슈팅 하이라이트
+
+<details>
+<summary><strong>외부 AI I/O로 인한 사용자 응답 지연</strong></summary>
+
+- 동기 호출에서는 LLM 응답까지 요청 스레드가 대기
+- `AFTER_COMMIT + @Async`로 외부 호출을 메모 생성 응답 경로에서 분리
+- 평균 응답 시간 `1,761.55ms → 9.46ms` 확인
+- AI 완료 시간은 별도 측정해 추론 성능 개선으로 오해하지 않도록 구분
+
 </details>
 
 <details>
-<summary><b>5. Spring 6 RestClient 슬라이스 테스트 격리 실패 이슈</b></summary>
+<summary><strong>FastAPI 장애가 Memo 저장으로 전파되는 문제</strong></summary>
 
-- **문제 상황:**
-  - `@RestClientTest` 실행 시 실제 타겟 서버(`localhost:8000`)로의 연결을 시도하여 `Connection refused` 발생.
-- **원인 분석:** 
-  - `AiClientConfig`에서 타임아웃 설정을 위해 생성한 `SimpleClientHttpRequestFactory`가 `@RestClientTest`의 내부 Mock RequestFactory를 덮어써 가로채기(Mock) 실패.
-- **해결 방안:**
-  - `@BeforeEach`에서 `MockRestServiceServer.bindTo(restClientBuilder)`를 통해 Mocking 채널이 연결된 `RestClient`를 직접 빌드하여 `AiClient`에 수동 주입하도록 테스트   아키텍처 리팩토링.
-- **결과:** 
-  - 외부 AI 서버 의존성 0%, 0.2초 이내의 초고속 슬라이스 테스트 파이프라인 구축 완료.
+- Memo 트랜잭션과 AI 후처리 트랜잭션을 분리
+- Mock 실패 테스트, 실제 트랜잭션 통합 테스트, FastAPI-down E2E를 각각 수행
+- 외부 AI 장애 시 Memo row와 Spring 가용성 유지 확인
+- 장애 격리는 구현했지만 자동 복구는 향후 과제로 명시
+
 </details>
 
 <details>
-<summary><b>6. 외부 AI I/O 블로킹 격리 및 비동기 E2E 검증</b></summary>
+<summary><strong>Spring-FastAPI DTO 계약 불일치</strong></summary>
 
-- **문제 상황:**
-  - 메모 작성과 FastAPI 연동을 진행했을때 클라이언트 응답 시간이 오래 걸리는 문제
-- **원인 분석:** 
-  - 동기 방식으로 FastAPI(LLM 추론)를 호출할 경우, 외부 네트워크 지연(평균 1.8초)으로 인해 클라이언트 응답 시간이 과도하게 증가했음.
-- **해결 방안:**
-  - ApplicationEventPublisher를 도입하여 메모 쓰기 트랜잭션 커밋 직후 (AFTER_COMMIT) 비동기 이벤트 발행.
-  - aiTaskExecutor 독립 스레드풀을 통해 RestClient 호출을 격리 처리함으로써 메인 스레드 블로킹 해소.
-- **검증 결과:** 
-  - Postman 기반 JWT 발급 → 메모 생성 → FastAPI AI 추론 → DB 후처리 전 과정 검증 성공.
-  - 메모 저장 API 응답 속도 1,800ms → 130ms(Cold) / 20ms(Warm) 로 대폭 단축.
-  - 외부 AI API 장애 발생 시에도 사용자 메모 원본 데이터의 영속성을 100% 보장하는 내결함성(Resilience) 확보.
-```
-비동기 이벤트 기반 아키텍처(EDA)를 통해 코어 비즈니스 트랜잭션과 외부 AI 통신을 물리적으로 분리함으로써, 시스템 가용성 보장과 레이턴시 90% 단축을 동시에 달성한 경험 (추후 삭제)
-```
+- Snake case JSON과 Java record 필드의 역직렬화 누락 확인
+- `memo_id`, `scheduled_at`, `location`, `summary_info`, `action_links` 계약 통일
+- `@JsonProperty`와 Pydantic 스키마를 1:1로 맞추고 RestClient 슬라이스 테스트로 고정
+
 </details>
 
 <details>
-<summary><b>7. 분산 MSA 통신 규격 정합성 교정 및 KST 기반 시계열 LLM 가드레일 구축</b></summary>
+<summary><strong>AI 결과의 무검증 자동 저장 위험</strong></summary>
 
-- **문제 상황:**
-  - Spring Boot와 FastAPI 간 비동기 메모 파싱 통신 시 역직렬화 누락으로 날짜(`scheduled_at`) 및 메타데이터가 `null`로 바인딩되는 결함 발생.
-  - 서버 배포 환경(UTC) 기준 시차(9시간)로 인해 야간 시간대 "오늘/내일" 상대 시간 파싱 오차가 발생하고, RAG 검증망 부재로 가짜 URL(404 에러 링크)이 생성되는 환각 현상 확인.
-- **원인 분석:** 
-  - Spring DTO(`MemoAiParseResponse`, `AiParserDto`)와 FastAPI Pydantic 스키마(`ScheduleMetadata`) 간 네이밍 불일치 및 상관관계 ID(`memo_id`) 누락으로 비동기 분산 환경의 추적성(Traceability) 훼손.
-  - `date.today()` 사용으로 인한 서버 로컬 타임존(UTC) 의존성 및 자유 생성 프롬프트의 신뢰 경계(Trust Boundary) 부재.
-- **해결 방안:**
-  - **Contract 정합성 동기화**: `memo_id`, `scheduled_at`, `location`, `summary_info`, `action_links` 규격으로 양측 스키마 1:1 일치화 및 Jackson Snake/Camel Case 바인딩 보정.
-  - **Temporal Grounding 가드레일**: `ZoneInfo("Asia/Seoul")` 기반 KST 오늘 날짜 주입 함수를 LCEL 체인에 바인딩하여 24시간 정확한 절대 날짜(`YYYY-MM-DD`) 변환 보장.
-  - **프롬프트 제약 및 할루시네이션 차단**: 검증되지 않은 임의 링크 생성을 원천 차단하고 구조화된 일정 메타데이터 추출에만 집중하도록 시스템 프롬프트 고도화.
-- **검증 결과:** 
-  - Spring ↔ FastAPI 간 비동기 페이로드 유실률 0% 달성 및 분산 상관관계 ID(`memo_id`) 기반 로그 추적성 확보.
-  - 타임존 오차 없는 시계열 일정 파싱 정확도 확보 및 안전한 Schedule 도메인 연동 기반 완성.
+- AI 결과를 곧바로 Schedule로 만들지 않고 `MemoAnalysis`에 제안 상태로 저장
+- 사용자가 확인한 경우에만 Schedule 생성
+- 소유권, 상태, 날짜, 중복 확정 및 동시 요청을 서버에서 검증
+
 </details>
+
+## 로드맵
+
+- [x] Spring 핵심 도메인과 JWT 인증
+- [x] Memo-FastAPI 비동기 E2E
+- [x] 동기·비동기 성능 비교 및 실제 장애 실험
+- [x] Schedule 월별 조회와 D-3 큐레이션
+- [x] AI 분석 저장·조회·사용자 확정 Two-Phase 흐름
+- [ ] Schedule 수정·단건 조회·완료 상태 API
+- [ ] 운영 DB 선정, 마이그레이션, 실제 DB 재검증
+- [ ] 실패 AI 작업 retry/outbox 도입
+- [ ] 얇은 캘린더 프론트엔드
+- [ ] Vector DB 기반 유사 Quest 가드레일
+- [ ] RAG, Docker Compose, CI/CD, 클라우드 배포
+
+## 개발 기록
+
+<details>
+<summary><strong>Revision History</strong></summary>
+
+| 날짜 | 주요 변경 |
+|---|---|
+| 2026.08.08 | Member, Pet, Quest 도메인 구축 |
+| 2026.08.09 | Dashboard Aggregator API 설계 |
+| 2026.08.10 | Quest 30분 수행 가드레일과 Pet 매핑 개선 |
+| 2026.08.12 | Memo CRUD 및 record DTO 도입 |
+| 2026.08.14 | Spring Security + Stateless JWT 구축 |
+| 2026.08.19 | Spring RestClient와 FastAPI 계약 테스트 |
+| 2026.08.20 | `AFTER_COMMIT + @Async` AI 파이프라인 구축 |
+| 2026.08.25 | Schedule 도메인과 D-3 조회 구현 |
+| 2026.08.28 | 성능·장애 실험 및 Two-Phase 분석 확정 흐름 구현 |
+
+</details>
+
+---
+
+이 저장소는 설계 선택의 이유와 검증 가능한 근거를 함께 남기는 것을 목표로 지속적으로 개선하고 있습니다.

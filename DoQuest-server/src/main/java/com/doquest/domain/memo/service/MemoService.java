@@ -4,7 +4,10 @@ import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.member.repository.MemberRepository;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
+import com.doquest.domain.memo.entity.MemoAnalysis;
+import com.doquest.domain.memo.entity.MemoAnalysisStatus;
 import com.doquest.domain.memo.event.MemoCreatedEvent;
+import com.doquest.domain.memo.repository.MemoAnalysisRepository;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
@@ -24,6 +27,7 @@ public class MemoService {
 
     private final MemoRepository memoRepository;
     private final MemberRepository memberRepository;
+    private final MemoAnalysisRepository memoAnalysisRepository;
     private final ApplicationEventPublisher eventPublisher; // 이벤트 발행기 주입
 
     /**
@@ -36,6 +40,7 @@ public class MemoService {
 
         Memo memo = Memo.createMemo(member, content);
         Memo savedMemo = memoRepository.save(memo);
+        memoAnalysisRepository.save(MemoAnalysis.pending(savedMemo));
 
         // 비동기 AI 파싱 도메인 이벤트 발행 (트랜잭션 Commit 완료 후 리스너 동작)
         eventPublisher.publishEvent(new MemoCreatedEvent(
@@ -74,6 +79,12 @@ public class MemoService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
 
         validateMemoOwner(memberId, memo);
+        memoAnalysisRepository.findByMemoId(memoId).ifPresent(analysis -> {
+            if (analysis.getStatus() == MemoAnalysisStatus.CONFIRMED) {
+                throw new BusinessException(ErrorCode.MEMO_HAS_CONFIRMED_SCHEDULE);
+            }
+            memoAnalysisRepository.delete(analysis);
+        });
         memoRepository.delete(memo);
     }
 

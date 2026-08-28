@@ -4,6 +4,7 @@ import com.doquest.domain.memo.dto.MemoCreateRequest;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.dto.MemoUpdateRequest;
 import com.doquest.domain.memo.service.MemoService;
+import com.doquest.domain.memo.service.MemoAnalysisService;
 import com.doquest.global.config.security.JwtAuthenticationFilter;
 import com.doquest.global.config.security.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +44,8 @@ class MemoControllerTest {
 
     @MockitoBean
     private MemoService memoService;
+    @MockitoBean
+    private MemoAnalysisService memoAnalysisService;
     @MockitoBean
     private JwtProvider jwtProvider;
     @MockitoBean

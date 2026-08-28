@@ -18,7 +18,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class MemoAiEventListener {
 
     private final AiClient aiClient;
-    private final MemoService memoService;
+    private final MemoAnalysisService memoAnalysisService;
 
     /**
      * 메인 메모 생성 트랜잭션이 커밋된 직후 비동기로 실행
@@ -41,8 +41,8 @@ public class MemoAiEventListener {
                     event.memoId(), response.isSchedule(), response.title(),
                     response.actionLinks() != null ? response.actionLinks().size() : 0);
 
-            // 메모 파싱 완료 플래그 갱신 (독립 트랜잭션 반영)
-            memoService.completeParsing(event.memoId());
+            // 분석 결과와 메모 파싱 완료 상태를 독립 트랜잭션에 함께 반영
+            memoAnalysisService.completeAnalysis(event.memoId(), response);
 
             // 후속 파이프라인 확장 포인트: 일정 감지 시 Schedule 도메인 연동
             // MemoAiEventListener.java 내부
@@ -53,6 +53,7 @@ public class MemoAiEventListener {
             }
 
         } catch (Exception e) {
+            memoAnalysisService.failAnalysis(event.memoId());
             // 외부 AI 통신 장애/타임아웃 발생 시 메인 메모 생성에 전파되지 않도록 장애 격리 로깅
             log.error("[AI 파이프라인 장애 격리] memoId={} 분석 실패 - Cause: {}", event.memoId(), e.getMessage(), e);
         }
