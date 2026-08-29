@@ -22,7 +22,7 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 | Two-Phase UX | AI 분석을 `PENDING → SUCCEEDED/FAILED → CONFIRMED` 상태로 관리하고 사용자 확정 후 Schedule 생성 |
 | 중복 확정 방지 | 상태 검증과 낙관적 잠금으로 동일 분석 결과의 Schedule 중복 생성 방어 |
 | 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
-| 테스트 | Spring 전체 `54 tests`, 실패 `0`, 오류 `0` |
+| 테스트 | Spring 전체 `56 tests`, 실패 `0`, 오류 `0` |
 
 성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
@@ -34,6 +34,7 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 
 ```text
 Memo 생성(201)
+→ 사용자 AI 일정 찾기 요청(202)
 → MemoAnalysis(PENDING)
 → AI 분석 완료(SUCCEEDED)
 → 사용자 확정(201)
@@ -83,7 +84,7 @@ flowchart LR
 
 ```text
 Transaction A
-Memo 저장 + MemoAnalysis(PENDING) 생성
+사용자의 분석 요청 + MemoAnalysis(PENDING) 생성
 COMMIT
     ↓
 @TransactionalEventListener(AFTER_COMMIT)
@@ -96,7 +97,7 @@ Transaction B (REQUIRES_NEW)
 MemoAnalysis(SUCCEEDED/FAILED) + Memo.isParsed 갱신
 ```
 
-- `AFTER_COMMIT`: Memo 저장이 성공한 경우에만 AI 파이프라인 실행
+- `AFTER_COMMIT`: 분석 요청 트랜잭션이 성공한 경우에만 AI 파이프라인 실행
 - `@Async`: 외부 LLM I/O를 HTTP 요청 스레드에서 분리
 - `REQUIRES_NEW`: AI 분석 결과를 독립 트랜잭션으로 반영
 - AI 장애 시 Memo 원본은 유지되지만 현재 자동 retry/outbox/DLQ는 제공하지 않음
@@ -105,7 +106,7 @@ MemoAnalysis(SUCCEEDED/FAILED) + Memo.isParsed 갱신
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: Memo 생성
+    [*] --> PENDING: 사용자 AI 일정 찾기 요청
     PENDING --> SUCCEEDED: AI 분석 성공
     PENDING --> FAILED: AI 호출 또는 분석 실패
     SUCCEEDED --> CONFIRMED: 사용자 일정 등록 확정
@@ -115,6 +116,7 @@ stateDiagram-v2
 AI가 판단한 결과를 곧바로 Schedule로 저장하지 않습니다. 프론트엔드는 분석 결과를 조회한 뒤 사용자의 명시적 확정을 받아 Schedule을 생성합니다.
 
 ```http
+POST /api/v1/memos/{memoId}/analysis
 GET  /api/v1/memos/{memoId}/analysis
 POST /api/v1/memos/{memoId}/analysis/confirm
 ```
@@ -171,7 +173,8 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 - 회원가입 및 JWT 로그인
 - 월별 캘린더와 날짜별 일정 조회
 - 일정 생성·수정·완료·삭제
-- 메모 작성 및 AI 분석 상태 조회
+- 메모장 단독 화면과 입력 중단 후 자동 저장
+- 사용자 요청으로 AI 분석 시작 및 상태 자동 폴링
 - AI 일정 제안 확인 후 Schedule 확정
 - 데스크톱·모바일 반응형 레이아웃
 
@@ -198,10 +201,11 @@ npm run dev
 | Auth | POST | `/api/v1/auth/signup` | 회원가입 |
 | Auth | POST | `/api/v1/auth/login` | 로그인 및 JWT 발급 |
 | Dashboard | GET | `/api/v1/dashboard` | Pet + 진행 중 Quest 통합 조회 |
-| Memo | POST | `/api/v1/memos` | Memo 생성 및 비동기 AI 분석 시작 |
+| Memo | POST | `/api/v1/memos` | Memo 생성 |
 | Memo | GET | `/api/v1/memos` | 회원의 Memo 목록 조회 |
 | Memo | PATCH | `/api/v1/memos/{memoId}` | Memo 수정 |
 | Memo | DELETE | `/api/v1/memos/{memoId}` | Memo 삭제 |
+| Analysis | POST | `/api/v1/memos/{memoId}/analysis` | 사용자 요청으로 비동기 AI 분석 시작 |
 | Analysis | GET | `/api/v1/memos/{memoId}/analysis` | AI 분석 상태와 결과 조회 |
 | Analysis | POST | `/api/v1/memos/{memoId}/analysis/confirm` | 분석 결과를 Schedule로 확정 |
 | Quest | POST | `/api/v1/quests` | Quest 생성 |
@@ -229,7 +233,7 @@ cd DoQuest-server
 현재 검증 결과:
 
 ```text
-54 tests completed
+56 tests completed
 0 failures
 0 errors
 ```
@@ -268,7 +272,7 @@ cd DoQuest-server
 <summary><strong>외부 AI I/O로 인한 사용자 응답 지연</strong></summary>
 
 - 동기 호출에서는 LLM 응답까지 요청 스레드가 대기
-- `AFTER_COMMIT + @Async`로 외부 호출을 메모 생성 응답 경로에서 분리
+- `AFTER_COMMIT + @Async`로 외부 호출을 분석 요청 응답 경로에서 분리
 - 평균 응답 시간 `1,761.55ms → 9.46ms` 확인
 - AI 완료 시간은 별도 측정해 추론 성능 개선으로 오해하지 않도록 구분
 
@@ -309,12 +313,22 @@ cd DoQuest-server
 - [x] 동기·비동기 성능 비교 및 실제 장애 실험
 - [x] Schedule 월별 조회와 D-3 큐레이션
 - [x] AI 분석 저장·조회·사용자 확정 Two-Phase 흐름
-- [ ] Schedule 수정·단건 조회·완료 상태 API
+- [x] Schedule 수정·단건 조회·완료 상태 API
+- [x] 캘린더·메모장 단독 프론트와 메모 자동 저장
+- [x] 명시적 AI 분석 시작과 결과 자동 폴링
 - [ ] 운영 DB 선정, 마이그레이션, 실제 DB 재검증
 - [ ] 실패 AI 작업 retry/outbox 도입
-- [ ] 얇은 캘린더 프론트엔드
+- [ ] 펫과 퀘스트 단독 화면
 - [ ] Vector DB 기반 유사 Quest 가드레일
 - [ ] RAG, Docker Compose, CI/CD, 클라우드 배포
+
+### 확장 계획
+
+- 한 메모에서 여러 일정 후보를 배열로 추출
+- 후보별 `PENDING / CONFIRMED / REJECTED` 상태와 부분 확정 지원
+- 메모 수정 후 재분석 시 기존 확정 일정과 신규 후보의 충돌 정책 수립
+- 반복 일정과 서로 다른 복수 일정의 구분
+- 후보 단위 중복 확정 방지 및 멱등성 제약 추가
 
 ## 개발 기록
 
@@ -333,6 +347,7 @@ cd DoQuest-server
 | 2026.08.25 | Schedule 도메인과 D-3 조회 구현 |
 | 2026.08.28 | 성능·장애 실험 및 Two-Phase 분석 확정 흐름 구현 |
 | 2026.08.28 | Two-Phase 정상 흐름·중복 확정·확정 Memo 삭제 HTTP E2E 검증 |
+| 2026.08.29 | 캘린더·메모장 단독 화면, 자동 저장, 명시적 AI 분석 및 자동 폴링 구현 |
 
 </details>
 

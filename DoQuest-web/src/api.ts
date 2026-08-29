@@ -10,6 +10,12 @@ export const session = {
 
 type ApiErrorBody = { message?: string; code?: string }
 
+export class ApiError extends Error {
+  constructor(public status: number, public code?: string, message?: string) {
+    super(message ?? `요청에 실패했습니다. (${status})`)
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers)
   if (options.body) headers.set('Content-Type', 'application/json')
@@ -22,7 +28,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({})) as ApiErrorBody
-    throw new Error(error.message ?? `요청에 실패했습니다. (${response.status})`)
+    throw new ApiError(response.status, error.code, error.message)
   }
   if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
@@ -65,8 +71,16 @@ export const api = {
   createMemo(content: string) {
     return request<number>('/api/v1/memos', { method: 'POST', body: JSON.stringify({ content }) })
   },
+  updateMemo(memoId: number, content: string) {
+    return request<void>(`/api/v1/memos/${memoId}`, {
+      method: 'PATCH', body: JSON.stringify({ content }),
+    })
+  },
   analysis(memoId: number) {
     return request<MemoAnalysis>(`/api/v1/memos/${memoId}/analysis`)
+  },
+  requestAnalysis(memoId: number) {
+    return request<MemoAnalysis>(`/api/v1/memos/${memoId}/analysis`, { method: 'POST' })
   },
   confirmAnalysis(memoId: number) {
     return request<Schedule>(`/api/v1/memos/${memoId}/analysis/confirm`, { method: 'POST' })
