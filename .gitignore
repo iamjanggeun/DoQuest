@@ -19,6 +19,11 @@ venv/
 ENV/
 .env
 
+### Node / Frontend ###
+node_modules/
+dist/
+*.tsbuildinfo
+
 # Local E2E credentials and temporary files
 private/
 

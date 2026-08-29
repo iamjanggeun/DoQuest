@@ -22,7 +22,7 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 | Two-Phase UX | AI 분석을 `PENDING → SUCCEEDED/FAILED → CONFIRMED` 상태로 관리하고 사용자 확정 후 Schedule 생성 |
 | 중복 확정 방지 | 상태 검증과 낙관적 잠금으로 동일 분석 결과의 Schedule 중복 생성 방어 |
 | 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
-| 테스트 | Spring 전체 `47 tests`, 실패 `0`, 오류 `0` |
+| 테스트 | Spring 전체 `54 tests`, 실패 `0`, 오류 `0` |
 
 성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
@@ -159,9 +159,35 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 | Async / Integration | Spring Event, `@Async`, RestClient |
 | Local Database | H2 In-Memory, MySQL compatibility mode |
 | AI Service | FastAPI, LangChain LCEL, OpenAI Structured Output |
+| Frontend MVP | React, TypeScript, Vite, Lucide |
 | Testing | JUnit 5, AssertJ, Mockito, MockMvc, MockRestServiceServer |
 
 현재 H2로 개발·검증 중이며 운영 DB는 아직 선정·연동하지 않았습니다. 운영 DB 선정 후 Flyway 또는 Liquibase 기반 마이그레이션과 실제 DB 통합 테스트를 추가할 예정입니다.
+
+## Frontend MVP
+
+`DoQuest-web`은 백엔드 API 계약과 Two-Phase 흐름을 실제 화면에서 검증하기 위한 React 기반 MVP입니다.
+
+- 회원가입 및 JWT 로그인
+- 월별 캘린더와 날짜별 일정 조회
+- 일정 생성·수정·완료·삭제
+- 메모 작성 및 AI 분석 상태 조회
+- AI 일정 제안 확인 후 Schedule 확정
+- 데스크톱·모바일 반응형 레이아웃
+
+로컬 개발 서버는 `/api` 요청을 Spring Boot의 `localhost:8080`으로 프록시하므로 별도의 CORS 설정 없이 연동할 수 있습니다.
+
+```bash
+cd DoQuest-server
+./gradlew bootRun
+
+# 별도 터미널
+cd DoQuest-web
+npm install
+npm run dev
+```
+
+브라우저에서 `http://localhost:5173`으로 접속합니다. AI 분석까지 확인하려면 FastAPI 서비스도 `localhost:8000`에서 실행해야 합니다.
 
 ## API 요약
 
@@ -203,7 +229,7 @@ cd DoQuest-server
 현재 검증 결과:
 
 ```text
-47 tests completed
+54 tests completed
 0 failures
 0 errors
 ```
