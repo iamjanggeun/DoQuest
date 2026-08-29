@@ -2,7 +2,7 @@ package com.doquest.domain.memo.service;
 
 import com.doquest.domain.ai.client.AiClient;
 import com.doquest.domain.ai.dto.AiParserDto;
-import com.doquest.domain.memo.event.MemoCreatedEvent;
+import com.doquest.domain.memo.event.MemoAnalysisRequestedEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +35,7 @@ class MemoAiEventListenerTest {
     @DisplayName("AI 파싱 성공 시 MemoService.completeParsing()을 호출한다")
     void handleMemoCreated_성공() {
         // given
-        MemoCreatedEvent event = new MemoCreatedEvent(100L, 1L, "내일 2시 알고리즘 스터디");
+        MemoAnalysisRequestedEvent event = new MemoAnalysisRequestedEvent(100L, 1L, "내일 2시 알고리즘 스터디");
         AiParserDto.Response mockResponse = new AiParserDto.Response(
                 true,                  // isSchedule
                 "알고리즘 스터디",                   // title
@@ -48,7 +48,7 @@ class MemoAiEventListenerTest {
         given(aiClient.parseMemo(100L, 1L, "내일 2시 알고리즘 스터디")).willReturn(mockResponse);
 
         // when
-        memoAiEventListener.handleMemoCreated(event);
+        memoAiEventListener.handleAnalysisRequested(event);
 
         // then
         verify(aiClient).parseMemo(100L, 1L, "내일 2시 알고리즘 스터디");
@@ -59,12 +59,12 @@ class MemoAiEventListenerTest {
     @DisplayName("FastAPI 서버 500 장애 발생 시 예외를 격리하고 상위로 전파하지 않는다")
     void handleMemoCreated_AI서버장애_내결함성_격리() {
         // given
-        MemoCreatedEvent event = new MemoCreatedEvent(100L, 1L, "장애 테스트 메모");
+        MemoAnalysisRequestedEvent event = new MemoAnalysisRequestedEvent(100L, 1L, "장애 테스트 메모");
         given(aiClient.parseMemo(100L, 1L,"장애 테스트 메모"))
                 .willThrow(new HttpServerErrorException(HttpStatusCode.valueOf(500), "FastAPI Server Down"));
 
         // when
-        memoAiEventListener.handleMemoCreated(event);
+        memoAiEventListener.handleAnalysisRequested(event);
 
         // then
         verify(aiClient).parseMemo(100L, 1L ,"장애 테스트 메모");

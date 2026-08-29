@@ -1,6 +1,8 @@
 package com.doquest.domain.memo.api;
 
 import com.doquest.domain.memo.dto.MemoCreateRequest;
+import com.doquest.domain.memo.dto.MemoAnalysisResponse;
+import com.doquest.domain.memo.entity.MemoAnalysisStatus;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.dto.MemoUpdateRequest;
 import com.doquest.domain.memo.service.MemoService;
@@ -21,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 
@@ -137,6 +140,23 @@ class MemoControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("AI 일정 찾기 시작 성공 - 202 Accepted")
+    void requestAnalysis_성공() throws Exception {
+        Long memberId = 1L;
+        Long memoId = 100L;
+        setMockAuthentication(memberId);
+        given(memoAnalysisService.requestAnalysis(memberId, memoId)).willReturn(
+                new MemoAnalysisResponse(memoId, MemoAnalysisStatus.PENDING, false,
+                        null, (LocalDate) null, null, null)
+        );
+
+        mockMvc.perform(post("/api/v1/memos/{memoId}/analysis", memoId))
+                .andDo(print())
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.status").value("PENDING"));
     }
 
     @Test

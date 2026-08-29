@@ -4,13 +4,17 @@ import com.doquest.domain.ai.dto.AiParserDto;
 import com.doquest.domain.memo.dto.MemoAnalysisResponse;
 import com.doquest.domain.memo.entity.MemoAnalysis;
 import com.doquest.domain.memo.entity.MemoAnalysisStatus;
+import com.doquest.domain.memo.entity.Memo;
+import com.doquest.domain.memo.event.MemoAnalysisRequestedEvent;
 import com.doquest.domain.memo.repository.MemoAnalysisRepository;
+import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.domain.schedule.dto.ScheduleCreateRequest;
 import com.doquest.domain.schedule.dto.ScheduleResponse;
 import com.doquest.domain.schedule.service.ScheduleService;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +27,22 @@ import java.time.format.DateTimeParseException;
 public class MemoAnalysisService {
 
     private final MemoAnalysisRepository memoAnalysisRepository;
+    private final MemoRepository memoRepository;
     private final ScheduleService scheduleService;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Transactional
+    public MemoAnalysisResponse requestAnalysis(Long memberId, Long memoId) {
+        Memo memo = memoRepository.findByIdAndMemberId(memoId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
+
+        MemoAnalysis analysis = memoAnalysisRepository.findByMemoId(memoId)
+                .map(this::restartIfPossible)
+                .orElseGet(() -> memoAnalysisRepository.save(MemoAnalysis.pending(memo)));
+
+        eventPublisher.publishEvent(new MemoAnalysisRequestedEvent(memoId, memberId, memo.getContent()));
+        return MemoAnalysisResponse.from(analysis);
+    }
 
     public MemoAnalysisResponse getAnalysis(Long memberId, Long memoId) {
         return MemoAnalysisResponse.from(findOwnedAnalysis(memberId, memoId));
@@ -78,6 +97,17 @@ public class MemoAnalysisService {
     private MemoAnalysis findAnalysis(Long memoId) {
         return memoAnalysisRepository.findByMemoId(memoId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMO_ANALYSIS_NOT_FOUND));
+    }
+
+    private MemoAnalysis restartIfPossible(MemoAnalysis analysis) {
+        if (analysis.getStatus() == MemoAnalysisStatus.CONFIRMED) {
+            throw new BusinessException(ErrorCode.MEMO_ANALYSIS_ALREADY_CONFIRMED);
+        }
+        if (analysis.getStatus() == MemoAnalysisStatus.PENDING) {
+            throw new BusinessException(ErrorCode.MEMO_ANALYSIS_IN_PROGRESS);
+        }
+        analysis.restart();
+        return analysis;
     }
 
     private LocalDate parseScheduledAt(String value) {

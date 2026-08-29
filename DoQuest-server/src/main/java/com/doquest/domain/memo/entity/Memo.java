@@ -60,4 +60,8 @@ public class Memo extends BaseTimeEntity {
     public void markAsParsed() {
         this.isParsed = true;
     }
+
+    public void resetParsed() {
+        this.isParsed = false;
+    }
 }

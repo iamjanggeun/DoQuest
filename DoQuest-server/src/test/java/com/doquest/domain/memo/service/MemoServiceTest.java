@@ -4,7 +4,6 @@ import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.member.repository.MemberRepository;
 import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
-import com.doquest.domain.memo.event.MemoCreatedEvent;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.domain.memo.repository.MemoAnalysisRepository;
 import com.doquest.global.error.BusinessException;
@@ -15,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -25,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,11 +41,8 @@ class MemoServiceTest {
     @Mock
     private MemoAnalysisRepository memoAnalysisRepository;
 
-    @Mock
-    private ApplicationEventPublisher eventPublisher; // 👈 비동기 이벤트 발행 검증용 Mock 주입
-
     @Test
-    @DisplayName("정상적인 내용으로 메모를 생성하면 메모 ID가 반환되고 AI 파싱 이벤트가 발행된다")
+    @DisplayName("정상적인 내용으로 메모를 생성하면 AI 분석 없이 메모 ID가 반환된다")
     void createMemo_성공() {
         // given
         Long memberId = 1L;
@@ -66,10 +62,7 @@ class MemoServiceTest {
         assertThat(savedId).isEqualTo(100L);
         assertThat(memo.isParsed()).isFalse();
         verify(memoRepository).save(any(Memo.class));
-        verify(memoAnalysisRepository).save(any(com.doquest.domain.memo.entity.MemoAnalysis.class));
-
-        // 👈 도메인 이벤트(MemoCreatedEvent)가 정상 발행되었는지 검증
-        verify(eventPublisher).publishEvent(any(MemoCreatedEvent.class));
+        verify(memoAnalysisRepository, never()).save(any());
     }
 
     @Test

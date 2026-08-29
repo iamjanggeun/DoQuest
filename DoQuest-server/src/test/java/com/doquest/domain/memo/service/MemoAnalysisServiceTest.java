@@ -5,7 +5,9 @@ import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.entity.MemoAnalysis;
 import com.doquest.domain.memo.entity.MemoAnalysisStatus;
+import com.doquest.domain.memo.event.MemoAnalysisRequestedEvent;
 import com.doquest.domain.memo.repository.MemoAnalysisRepository;
+import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.domain.schedule.dto.ScheduleResponse;
 import com.doquest.domain.schedule.service.ScheduleService;
 import com.doquest.global.error.BusinessException;
@@ -17,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -37,7 +40,30 @@ class MemoAnalysisServiceTest {
     private MemoAnalysisRepository memoAnalysisRepository;
 
     @Mock
+    private MemoRepository memoRepository;
+
+    @Mock
     private ScheduleService scheduleService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Test
+    void requestAnalysis_성공() {
+        Long memberId = 1L;
+        Long memoId = 10L;
+        MemoAnalysis analysis = createPendingAnalysis(memberId, memoId);
+        Memo memo = analysis.getMemo();
+        given(memoRepository.findByIdAndMemberId(memoId, memberId)).willReturn(Optional.of(memo));
+        given(memoAnalysisRepository.findByMemoId(memoId)).willReturn(Optional.empty());
+        given(memoAnalysisRepository.save(org.mockito.ArgumentMatchers.any(MemoAnalysis.class)))
+                .willReturn(analysis);
+
+        var result = memoAnalysisService.requestAnalysis(memberId, memoId);
+
+        assertThat(result.status()).isEqualTo(MemoAnalysisStatus.PENDING);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(MemoAnalysisRequestedEvent.class));
+    }
 
     @Test
     void completeAnalysis_성공() {

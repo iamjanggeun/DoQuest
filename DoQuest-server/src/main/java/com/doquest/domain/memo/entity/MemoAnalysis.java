@@ -70,6 +70,16 @@ public class MemoAnalysis extends BaseTimeEntity {
         this.status = MemoAnalysisStatus.FAILED;
     }
 
+    public void restart() {
+        this.status = MemoAnalysisStatus.PENDING;
+        this.scheduleCandidate = false;
+        this.title = null;
+        this.scheduledAt = null;
+        this.location = null;
+        this.summaryInfo = null;
+        this.memo.resetParsed();
+    }
+
     public void confirm() {
         this.status = MemoAnalysisStatus.CONFIRMED;
     }

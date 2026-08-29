@@ -38,6 +38,9 @@ class MemoAfterCommitIntegrationTest {
     private MemoService memoService;
 
     @Autowired
+    private MemoAnalysisService memoAnalysisService;
+
+    @Autowired
     private MemberRepository memberRepository;
 
     @Autowired
@@ -64,7 +67,7 @@ class MemoAfterCommitIntegrationTest {
     }
 
     @Test
-    @DisplayName("메모 커밋 후 AI 호출과 파싱 완료 갱신이 실행된다")
+    @DisplayName("분석 요청 커밋 후 AI 호출과 파싱 완료 갱신이 실행된다")
     void committedMemo_TriggersAiAndMarksParsed() throws InterruptedException {
         CountDownLatch aiCalled = new CountDownLatch(1);
         AtomicBoolean memoVisibleWhenAiCalled = new AtomicBoolean(false);
@@ -77,6 +80,7 @@ class MemoAfterCommitIntegrationTest {
         });
 
         Long memoId = memoService.createMemo(member.getId(), "내일 통합 테스트 결과 확인");
+        memoAnalysisService.requestAnalysis(member.getId(), memoId);
 
         assertThat(aiCalled.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(memoVisibleWhenAiCalled).isTrue();
@@ -93,6 +97,7 @@ class MemoAfterCommitIntegrationTest {
         });
 
         Long memoId = memoService.createMemo(member.getId(), "AI 장애 격리 테스트");
+        memoAnalysisService.requestAnalysis(member.getId(), memoId);
 
         assertThat(aiCalled.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(memoRepository.findById(memoId))
@@ -103,13 +108,15 @@ class MemoAfterCommitIntegrationTest {
     }
 
     @Test
-    @DisplayName("메모 생성 트랜잭션이 롤백되면 AI 리스너는 실행되지 않는다")
+    @DisplayName("분석 요청 트랜잭션이 롤백되면 AI 리스너는 실행되지 않는다")
     void rolledBackMemo_DoesNotTriggerAi() throws InterruptedException {
         AtomicLong rolledBackMemoId = new AtomicLong();
         TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
 
         transactionTemplate.executeWithoutResult(status -> {
-            rolledBackMemoId.set(memoService.createMemo(member.getId(), "롤백 이벤트 테스트"));
+            Long memoId = memoService.createMemo(member.getId(), "롤백 이벤트 테스트");
+            rolledBackMemoId.set(memoId);
+            memoAnalysisService.requestAnalysis(member.getId(), memoId);
             status.setRollbackOnly();
         });
 

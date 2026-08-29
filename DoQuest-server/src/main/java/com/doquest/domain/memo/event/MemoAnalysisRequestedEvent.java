@@ -1,6 +1,6 @@
 package com.doquest.domain.memo.event;
 
-public record MemoCreatedEvent(
+public record MemoAnalysisRequestedEvent(
         Long memoId,
         Long memberId,
         String content

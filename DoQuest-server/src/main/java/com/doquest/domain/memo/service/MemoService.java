@@ -6,14 +6,12 @@ import com.doquest.domain.memo.dto.MemoResponse;
 import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.entity.MemoAnalysis;
 import com.doquest.domain.memo.entity.MemoAnalysisStatus;
-import com.doquest.domain.memo.event.MemoCreatedEvent;
 import com.doquest.domain.memo.repository.MemoAnalysisRepository;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +26,9 @@ public class MemoService {
     private final MemoRepository memoRepository;
     private final MemberRepository memberRepository;
     private final MemoAnalysisRepository memoAnalysisRepository;
-    private final ApplicationEventPublisher eventPublisher; // 이벤트 발행기 주입
 
     /**
-     * 신규 메모 생성 및 비동기 AI 파싱 이벤트 트리거 추가
+     * 신규 메모 저장. AI 분석은 사용자의 명시적 요청으로 별도 시작한다.
      */
     @Transactional
     public Long createMemo(Long memberId, String content) {
@@ -40,16 +37,7 @@ public class MemoService {
 
         Memo memo = Memo.createMemo(member, content);
         Memo savedMemo = memoRepository.save(memo);
-        memoAnalysisRepository.save(MemoAnalysis.pending(savedMemo));
-
-        // 비동기 AI 파싱 도메인 이벤트 발행 (트랜잭션 Commit 완료 후 리스너 동작)
-        eventPublisher.publishEvent(new MemoCreatedEvent(
-                savedMemo.getId(),
-                member.getId(),
-                savedMemo.getContent()
-        ));
-
-        log.info("[메모 생성] memoId={}, memberId={}, AI 파싱 이벤트 발행 완료", savedMemo.getId(), memberId);
+        log.info("[메모 생성] memoId={}, memberId={}", savedMemo.getId(), memberId);
         return savedMemo.getId();
     }
 
@@ -70,6 +58,15 @@ public class MemoService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
 
         validateMemoOwner(memberId, memo);
+        memoAnalysisRepository.findByMemoId(memoId).ifPresent(analysis -> {
+            if (analysis.getStatus() == MemoAnalysisStatus.PENDING) {
+                throw new BusinessException(ErrorCode.MEMO_ANALYSIS_IN_PROGRESS);
+            }
+            if (analysis.getStatus() != MemoAnalysisStatus.CONFIRMED) {
+                memoAnalysisRepository.delete(analysis);
+                memo.resetParsed();
+            }
+        });
         memo.updateContent(newContent);
     }
 

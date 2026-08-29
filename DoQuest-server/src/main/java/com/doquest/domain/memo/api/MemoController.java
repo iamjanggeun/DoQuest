@@ -54,6 +54,14 @@ public class MemoController {
         return ResponseEntity.ok(memoAnalysisService.getAnalysis(memberId, memoId));
     }
 
+    @PostMapping("/{memoId}/analysis")
+    public ResponseEntity<MemoAnalysisResponse> requestMemoAnalysis(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long memoId) {
+        return ResponseEntity.accepted()
+                .body(memoAnalysisService.requestAnalysis(memberId, memoId));
+    }
+
     @PostMapping("/{memoId}/analysis/confirm")
     public ResponseEntity<ScheduleResponse> confirmMemoAnalysis(
             @AuthenticationPrincipal Long memberId,
