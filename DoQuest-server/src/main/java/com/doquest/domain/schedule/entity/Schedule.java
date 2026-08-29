@@ -93,7 +93,7 @@ public class Schedule extends BaseTimeEntity {
         this.summaryInfo = summaryInfo;
     }
 
-    public void toggleComplete() {
-        this.isCompleted = !this.isCompleted;
+    public void changeCompletion(boolean completed) {
+        this.isCompleted = completed;
     }
 }

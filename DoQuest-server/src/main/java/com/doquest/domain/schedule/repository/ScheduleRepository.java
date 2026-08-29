@@ -7,8 +7,11 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
+
+    Optional<Schedule> findByIdAndMemberId(Long scheduleId, Long memberId);
 
     // 특정 회원의 특정 기간(한 달 등) 일정 조회 (캘린더 렌더링용)
     List<Schedule> findByMemberIdAndScheduledAtBetweenOrderByScheduledAtAsc(

@@ -102,8 +102,8 @@ class ScheduleTest {
     class UpdateAndToggleTest {
 
         @Test
-        @DisplayName("[성공] toggleComplete 호출 시 완료 상태가 토글된다.")
-        void toggleComplete_Success() {
+        @DisplayName("[성공] changeCompletion 호출 시 요청한 완료 상태로 변경된다.")
+        void changeCompletion_Success() {
             // given
             Member member = createTestMember();
             Schedule schedule = Schedule.createSchedule(
@@ -113,10 +113,10 @@ class ScheduleTest {
             // when & then
             assertThat(schedule.isCompleted()).isFalse();
 
-            schedule.toggleComplete();
+            schedule.changeCompletion(true);
             assertThat(schedule.isCompleted()).isTrue();
 
-            schedule.toggleComplete();
+            schedule.changeCompletion(false);
             assertThat(schedule.isCompleted()).isFalse();
         }
 

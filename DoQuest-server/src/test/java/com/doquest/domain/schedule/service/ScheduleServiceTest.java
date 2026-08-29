@@ -6,6 +6,7 @@ import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.domain.schedule.dto.ScheduleCreateRequest;
 import com.doquest.domain.schedule.dto.ScheduleResponse;
+import com.doquest.domain.schedule.dto.ScheduleUpdateRequest;
 import com.doquest.domain.schedule.entity.Schedule;
 import com.doquest.domain.schedule.repository.ScheduleRepository;
 import com.doquest.global.error.BusinessException;
@@ -138,6 +139,25 @@ class ScheduleServiceTest {
         }
 
         @Test
+        @DisplayName("[성공] 일정 단건 조회 시 로그인 회원 소유 일정만 반환한다.")
+        void getSchedule_Success() {
+            Long memberId = 1L;
+            Long scheduleId = 100L;
+            Member member = createMember(memberId);
+            Schedule schedule = Schedule.createSchedule(
+                    member, null, "단건 일정", LocalDate.of(2026, 8, 28), "서울", "상세"
+            );
+            ReflectionTestUtils.setField(schedule, "id", scheduleId);
+            given(scheduleRepository.findByIdAndMemberId(scheduleId, memberId))
+                    .willReturn(Optional.of(schedule));
+
+            ScheduleResponse response = scheduleService.getSchedule(memberId, scheduleId);
+
+            assertThat(response.scheduleId()).isEqualTo(scheduleId);
+            assertThat(response.title()).isEqualTo("단건 일정");
+        }
+
+        @Test
         @DisplayName("[성공] D-3 마감 임박 일정 큐레이션 목록을 반환한다.")
         void getUpcomingCuration_Success() {
             // given
@@ -161,6 +181,55 @@ class ScheduleServiceTest {
     }
 
     @Nested
+    @DisplayName("일정 수정 및 완료 상태 검증")
+    class UpdateScheduleServiceTest {
+
+        @Test
+        @DisplayName("[성공] 일정의 캘린더 표시 정보를 수정한다.")
+        void updateSchedule_Success() {
+            Long memberId = 1L;
+            Long scheduleId = 100L;
+            Member member = createMember(memberId);
+            Schedule schedule = Schedule.createSchedule(
+                    member, null, "기존 일정", LocalDate.of(2026, 8, 28), null, null
+            );
+            ReflectionTestUtils.setField(schedule, "id", scheduleId);
+            ScheduleUpdateRequest request = new ScheduleUpdateRequest(
+                    "수정 일정", LocalDate.of(2026, 9, 1), "강남", "수정 요약"
+            );
+            given(scheduleRepository.findByIdAndMemberId(scheduleId, memberId))
+                    .willReturn(Optional.of(schedule));
+
+            ScheduleResponse response = scheduleService.updateSchedule(memberId, scheduleId, request);
+
+            assertThat(response.title()).isEqualTo("수정 일정");
+            assertThat(response.scheduledAt()).isEqualTo(LocalDate.of(2026, 9, 1));
+            assertThat(response.location()).isEqualTo("강남");
+            assertThat(response.summaryInfo()).isEqualTo("수정 요약");
+        }
+
+        @Test
+        @DisplayName("[성공] 완료 상태를 요청 값으로 멱등 변경한다.")
+        void changeCompletion_Success() {
+            Long memberId = 1L;
+            Long scheduleId = 100L;
+            Member member = createMember(memberId);
+            Schedule schedule = Schedule.createSchedule(
+                    member, null, "완료할 일정", LocalDate.of(2026, 8, 28), null, null
+            );
+            ReflectionTestUtils.setField(schedule, "id", scheduleId);
+            given(scheduleRepository.findByIdAndMemberId(scheduleId, memberId))
+                    .willReturn(Optional.of(schedule));
+
+            ScheduleResponse first = scheduleService.changeCompletion(memberId, scheduleId, true);
+            ScheduleResponse second = scheduleService.changeCompletion(memberId, scheduleId, true);
+
+            assertThat(first.isCompleted()).isTrue();
+            assertThat(second.isCompleted()).isTrue();
+        }
+    }
+
+    @Nested
     @DisplayName("일정 삭제 검증")
     class DeleteScheduleServiceTest {
 
@@ -169,20 +238,14 @@ class ScheduleServiceTest {
         void deleteSchedule_OtherMemberSchedule_ThrowsException() {
             // given
             Long memberId = 1L;
-            Long otherMemberId = 2L;
             Long scheduleId = 100L;
 
-            Member otherMember = createMember(otherMemberId);
-            Schedule schedule = Schedule.createSchedule(
-                    otherMember, null, "타인 일정", LocalDate.of(2026, 8, 28), null, null
-            );
-
-            given(scheduleRepository.findById(scheduleId)).willReturn(Optional.of(schedule));
+            given(scheduleRepository.findByIdAndMemberId(scheduleId, memberId)).willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> scheduleService.deleteSchedule(memberId, scheduleId))
                     .isInstanceOf(BusinessException.class)
-                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SCHEDULE_NOT_FOUND);
         }
     }
 }

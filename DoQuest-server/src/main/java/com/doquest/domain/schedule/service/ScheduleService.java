@@ -6,6 +6,7 @@ import com.doquest.domain.memo.entity.Memo;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.domain.schedule.dto.ScheduleCreateRequest;
 import com.doquest.domain.schedule.dto.ScheduleResponse;
+import com.doquest.domain.schedule.dto.ScheduleUpdateRequest;
 import com.doquest.domain.schedule.entity.Schedule;
 import com.doquest.domain.schedule.repository.ScheduleRepository;
 import com.doquest.global.error.BusinessException;
@@ -54,6 +55,24 @@ public class ScheduleService {
                 .toList();
     }
 
+    public ScheduleResponse getSchedule(Long memberId, Long scheduleId) {
+        return ScheduleResponse.from(findOwnedSchedule(memberId, scheduleId));
+    }
+
+    @Transactional
+    public ScheduleResponse updateSchedule(Long memberId, Long scheduleId, ScheduleUpdateRequest request) {
+        Schedule schedule = findOwnedSchedule(memberId, scheduleId);
+        schedule.update(request.title(), request.scheduledAt(), request.location(), request.summaryInfo());
+        return ScheduleResponse.from(schedule);
+    }
+
+    @Transactional
+    public ScheduleResponse changeCompletion(Long memberId, Long scheduleId, boolean completed) {
+        Schedule schedule = findOwnedSchedule(memberId, scheduleId);
+        schedule.changeCompletion(completed);
+        return ScheduleResponse.from(schedule);
+    }
+
     public List<ScheduleResponse> getUpcomingCuration(Long memberId) {
         LocalDate today = LocalDate.now();
         LocalDate dPlus3 = today.plusDays(3);
@@ -66,13 +85,12 @@ public class ScheduleService {
 
     @Transactional
     public void deleteSchedule(Long memberId, Long scheduleId) {
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.SCHEDULE_NOT_FOUND));
-
-        if (!schedule.getMember().getId().equals(memberId)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-
+        Schedule schedule = findOwnedSchedule(memberId, scheduleId);
         scheduleRepository.delete(schedule);
+    }
+
+    private Schedule findOwnedSchedule(Long memberId, Long scheduleId) {
+        return scheduleRepository.findByIdAndMemberId(scheduleId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SCHEDULE_NOT_FOUND));
     }
 }

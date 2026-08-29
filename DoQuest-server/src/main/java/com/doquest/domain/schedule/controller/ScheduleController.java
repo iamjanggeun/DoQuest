@@ -2,6 +2,8 @@ package com.doquest.domain.schedule.controller;
 
 import com.doquest.domain.schedule.dto.ScheduleCreateRequest;
 import com.doquest.domain.schedule.dto.ScheduleResponse;
+import com.doquest.domain.schedule.dto.ScheduleUpdateRequest;
+import com.doquest.domain.schedule.dto.ScheduleCompletionRequest;
 import com.doquest.domain.schedule.service.ScheduleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,32 @@ public class ScheduleController {
             @RequestParam int month
     ) {
         return ResponseEntity.ok(scheduleService.getMonthlySchedules(memberId, year, month));
+    }
+
+    @GetMapping("/{scheduleId}")
+    public ResponseEntity<ScheduleResponse> getSchedule(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long scheduleId
+    ) {
+        return ResponseEntity.ok(scheduleService.getSchedule(memberId, scheduleId));
+    }
+
+    @PatchMapping("/{scheduleId}")
+    public ResponseEntity<ScheduleResponse> updateSchedule(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long scheduleId,
+            @Valid @RequestBody ScheduleUpdateRequest request
+    ) {
+        return ResponseEntity.ok(scheduleService.updateSchedule(memberId, scheduleId, request));
+    }
+
+    @PatchMapping("/{scheduleId}/completion")
+    public ResponseEntity<ScheduleResponse> changeCompletion(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable Long scheduleId,
+            @Valid @RequestBody ScheduleCompletionRequest request
+    ) {
+        return ResponseEntity.ok(scheduleService.changeCompletion(memberId, scheduleId, request.completed()));
     }
 
     // D-3 마감 임박 큐레이팅 조회 (대시보드/퀘스트 화면용)
