@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, CalendarDays, Check, CheckCircle2, Clock3,
   LoaderCircle, LogOut, MapPin, Plus, Sparkles, Trash2, X,
@@ -108,6 +108,12 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
   const selectedSchedules = schedules.filter(item => item.scheduledAt === selectedDate)
   const doneCount = schedules.filter(item => item.isCompleted).length
 
+  const upsertMemo = useCallback((saved: Memo) => {
+    setMemos(current => current.some(item => item.id === saved.id)
+      ? current.map(item => item.id === saved.id ? saved : item)
+      : [saved, ...current])
+  }, [])
+
   async function toggle(item: Schedule) {
     try {
       const updated = await api.completeSchedule(item.scheduleId, !item.isCompleted)
@@ -159,7 +165,7 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
       </aside>
     </main> : <MemoPage
       initialMemos={memos}
-      onChanged={() => void load()}
+      onMemoSaved={upsertMemo}
       onScheduleConfirmed={() => { void load(); setToast('캘린더에 일정을 등록했습니다.') }}
       onToast={setToast}
     />}
@@ -214,7 +220,7 @@ function ScheduleModal({ value, date, onClose, onSaved, onDelete }: { value: Sch
   </div>
 }
 
-function MemoPage({ initialMemos, onChanged, onScheduleConfirmed, onToast }: { initialMemos: Memo[]; onChanged: () => void; onScheduleConfirmed: () => void; onToast: (message: string) => void }) {
+function MemoPage({ initialMemos, onMemoSaved, onScheduleConfirmed, onToast }: { initialMemos: Memo[]; onMemoSaved: (memo: Memo) => void; onScheduleConfirmed: () => void; onToast: (message: string) => void }) {
   const [items, setItems] = useState(initialMemos)
   const [selectedId, setSelectedId] = useState<number | 'draft' | null>(initialMemos[0]?.id ?? null)
   const [content, setContent] = useState(initialMemos[0]?.content ?? '')
@@ -222,8 +228,16 @@ function MemoPage({ initialMemos, onChanged, onScheduleConfirmed, onToast }: { i
   const [saveState, setSaveState] = useState<'saved' | 'saving' | 'error'>('saved')
   const [analysis, setAnalysis] = useState<MemoAnalysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const saveInFlight = useRef(false)
+  const selectedIdRef = useRef(selectedId)
+  const contentRef = useRef(content)
+  const onMemoSavedRef = useRef(onMemoSaved)
 
   useEffect(() => { setItems(initialMemos) }, [initialMemos])
+  useEffect(() => { selectedIdRef.current = selectedId }, [selectedId])
+  useEffect(() => { contentRef.current = content }, [content])
+  useEffect(() => { onMemoSavedRef.current = onMemoSaved }, [onMemoSaved])
 
   const readAnalysis = useCallback(async (memoId: number) => {
     try {
@@ -256,24 +270,42 @@ function MemoPage({ initialMemos, onChanged, onScheduleConfirmed, onToast }: { i
     if (!content.trim() || content === savedContent || analysis?.status === 'PENDING') return
     setSaveState('saving')
     const timer = window.setTimeout(async () => {
+      if (saveInFlight.current) return
+      saveInFlight.current = true
+      const savingId = selectedIdRef.current
+      const savingContent = contentRef.current
       try {
-        if (selectedId === 'draft') {
-          const id = await api.createMemo(content)
-          const created: Memo = { id, content, isParsed: false, createdAt: new Date().toISOString() }
+        if (savingId === 'draft') {
+          const id = await api.createMemo(savingContent)
+          const created: Memo = { id, content: savingContent, isParsed: false, createdAt: new Date().toISOString() }
           setItems(current => [created, ...current])
-          setSelectedId(id)
-        } else if (typeof selectedId === 'number') {
-          await api.updateMemo(selectedId, content)
-          setItems(current => current.map(item => item.id === selectedId ? { ...item, content, isParsed: false } : item))
+          onMemoSavedRef.current(created)
+          if (selectedIdRef.current === 'draft') setSelectedId(id)
+        } else if (typeof savingId === 'number') {
+          await api.updateMemo(savingId, savingContent)
+          let updatedMemo: Memo | null = null
+          setItems(current => current.map(item => {
+            if (item.id !== savingId) return item
+            updatedMemo = { ...item, content: savingContent, isParsed: false }
+            return updatedMemo
+          }))
+          if (updatedMemo) onMemoSavedRef.current(updatedMemo)
           setAnalysis(null)
         }
-        setSavedContent(content); setSaveState('saved'); onChanged()
+        setSavedContent(savingContent)
+        setSaveState(contentRef.current === savingContent ? 'saved' : 'saving')
       } catch (error) {
-        setSaveState('error'); onToast(error instanceof Error ? error.message : '메모를 저장하지 못했습니다.')
+        console.error('[메모 자동 저장 실패]', { selectedId: savingId, error })
+        setSaveState('error')
+        onToast(error instanceof ApiError
+          ? error.message
+          : '메모 저장 요청이 중단됐습니다. 다시 저장해주세요.')
+      } finally {
+        saveInFlight.current = false
       }
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [content, savedContent, selectedId, analysis?.status, onChanged, onToast])
+  }, [content, savedContent, selectedId, analysis?.status, retryCount, onToast])
 
   function selectMemo(memo: Memo) {
     setSelectedId(memo.id); setContent(memo.content); setSavedContent(memo.content); setSaveState('saved'); setAnalysis(null)
@@ -281,6 +313,12 @@ function MemoPage({ initialMemos, onChanged, onScheduleConfirmed, onToast }: { i
 
   function createDraft() {
     setSelectedId('draft'); setContent(''); setSavedContent(''); setAnalysis(null); setSaveState('saved')
+  }
+
+  function retrySave() {
+    if (saveInFlight.current) return
+    setSaveState('saving')
+    setRetryCount(value => value + 1)
   }
 
   async function startAnalysis() {
@@ -302,14 +340,16 @@ function MemoPage({ initialMemos, onChanged, onScheduleConfirmed, onToast }: { i
   }
 
   const locked = analysis?.status === 'PENDING'
+  const hasUnsavedChanges = content !== savedContent
+  const canChangeMemo = !locked && !hasUnsavedChanges && saveState === 'saved'
   return <main className="notes-page">
     <aside className="notes-list-panel">
-      <div className="notes-list-head"><div><p className="eyebrow">MY NOTES</p><h1>메모장</h1></div><button className="primary square" onClick={createDraft} aria-label="새 메모"><Plus/></button></div>
-      <div className="notes-list">{items.length === 0 && selectedId !== 'draft' ? <Empty icon={<Sparkles/>} title="첫 메모를 남겨보세요"/> : items.map(memo => <button key={memo.id} className={selectedId === memo.id ? 'active' : ''} onClick={() => selectMemo(memo)}><b>{memo.content.split('\n')[0] || '새 메모'}</b><p>{memo.content.replace(/\n/g, ' ')}</p><small>{new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(memo.createdAt))}</small></button>)}</div>
+      <div className="notes-list-head"><div><p className="eyebrow">MY NOTES</p><h1>메모장</h1></div><button className="primary square" onClick={createDraft} disabled={!canChangeMemo} aria-label="새 메모"><Plus/></button></div>
+      <div className="notes-list">{items.length === 0 && selectedId !== 'draft' ? <Empty icon={<Sparkles/>} title="첫 메모를 남겨보세요"/> : items.map(memo => <button key={memo.id} disabled={!canChangeMemo} className={selectedId === memo.id ? 'active' : ''} onClick={() => selectMemo(memo)}><b>{memo.content.split('\n')[0] || '새 메모'}</b><p>{memo.content.replace(/\n/g, ' ')}</p><small>{new Intl.DateTimeFormat('ko-KR', { month: 'short', day: 'numeric' }).format(new Date(memo.createdAt))}</small></button>)}</div>
     </aside>
     <section className="note-editor-panel">
       {selectedId === null ? <Empty icon={<Sparkles/>} title="메모를 선택하세요" body="왼쪽 목록에서 메모를 선택하거나 새 메모를 만들어보세요."/> : <>
-        <div className="editor-toolbar"><span className={`save-state ${saveState}`}>{locked ? 'AI 분석 중 · 편집 잠금' : saveState === 'saving' ? '저장 중…' : saveState === 'error' ? '저장 실패' : '저장됨'}</span><button className="primary" onClick={() => void startAnalysis()} disabled={selectedId === 'draft' || !content.trim() || content !== savedContent || locked || analyzing || analysis?.status === 'CONFIRMED'}><Sparkles size={16}/>{analysis?.status === 'FAILED' ? 'AI 다시 찾기' : 'AI로 일정 찾기'}</button></div>
+        <div className="editor-toolbar"><span className={`save-state ${saveState}`}>{locked ? 'AI 분석 중 · 편집 잠금' : saveState === 'saving' ? '저장 중…' : saveState === 'error' ? '저장 실패' : '저장됨'}</span>{saveState === 'error' && <button className="outline retry-save" onClick={retrySave}>다시 저장</button>}<button className="primary" onClick={() => void startAnalysis()} disabled={selectedId === 'draft' || !content.trim() || content !== savedContent || locked || analyzing || analysis?.status === 'CONFIRMED'}><Sparkles size={16}/>{analysis?.status === 'FAILED' ? 'AI 다시 찾기' : 'AI로 일정 찾기'}</button></div>
         <textarea className="note-editor" aria-label="메모 내용" value={content} readOnly={locked} onChange={event => setContent(event.target.value)} placeholder="무엇이든 자유롭게 적어보세요. 입력을 멈추면 자동으로 저장됩니다."/>
         <div className="analysis-strip">{!analysis ? <div className="analysis-hint"><Sparkles/><span><b>일정이 포함되어 있나요?</b><small>메모를 저장한 뒤 AI로 일정 후보를 찾아보세요.</small></span></div> : analyzing && analysis.status === 'PENDING' ? <div className="analysis-hint active"><LoaderCircle className="spin"/><span><b>AI가 메모에서 일정을 찾고 있어요</b><small>결과가 준비되면 이곳에 자동으로 표시됩니다.</small></span></div> : <AnalysisView value={analysis} onRefresh={() => typeof selectedId === 'number' && void readAnalysis(selectedId)} onConfirm={() => void confirm()}/>}</div>
       </>}
