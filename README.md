@@ -8,6 +8,7 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 
 - 외부 LLM 호출이 핵심 메모 저장 트랜잭션을 지연시키거나 롤백시키지 않도록 격리
 - AI 분석 결과를 즉시 영속화하지 않고 사용자가 확인한 뒤 일정으로 등록하는 Two-Phase UX
+- KST 현재 시각을 기준으로 상대 날짜·시간을 해석하고, 시간이 없는 일정은 날짜만 유지
 - JWT의 회원 식별자를 기준으로 모든 도메인 데이터의 소유권 검증
 - 반복되는 일정 추천에 LLM을 사용하지 않고 인덱스 기반 쿼리로 처리
 - 단위·슬라이스·트랜잭션 통합·실제 장애 실험을 통한 설계 근거 확보
@@ -22,7 +23,8 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 | Two-Phase UX | AI 분석을 `PENDING → SUCCEEDED/FAILED → CONFIRMED` 상태로 관리하고 사용자 확정 후 Schedule 생성 |
 | 중복 확정 방지 | 상태 검증과 낙관적 잠금으로 동일 분석 결과의 Schedule 중복 생성 방어 |
 | 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
-| 테스트 | Spring 전체 `56 tests`, 실패 `0`, 오류 `0` |
+| 날짜·시간 계약 | `scheduled_at(YYYY-MM-DD)`과 선택형 `scheduled_time(HH:mm)`을 분리해 FastAPI-Spring-React End-to-End 연동 |
+| 테스트 | Spring 전체 `57 tests`, 실패 `0`, 오류 `0` |
 
 성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
@@ -71,7 +73,7 @@ flowchart LR
 
     Client -->|JWT REST API| Spring
     Spring -->|Memo commit| H2
-    Spring --> Event
+    Spring -->|사용자 분석 요청 commit| Event
     Event --> Worker
     Worker -->|RestClient| FastAPI
     FastAPI --> OpenAI
@@ -134,8 +136,9 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 ### Memo / MemoAnalysis / Schedule
 
 - Memo 원문과 AI 분석 결과, 확정된 Schedule을 분리해 각 도메인의 책임을 명확히 유지
-- AI 응답 계약: `is_schedule`, `title`, `scheduled_at`, `location`, `summary_info`, `action_links`
-- KST 기준 Temporal Grounding은 FastAPI에서 처리하고 Spring은 `LocalDate`로 검증·변환
+- AI 응답 계약: `is_schedule`, `title`, `scheduled_at`, `scheduled_time`, `location`, `summary_info`, `action_links`
+- KST 기준 Temporal Grounding은 FastAPI에서 처리하고 Spring은 날짜를 `LocalDate`, 선택 시간을 `LocalTime`으로 검증·변환
+- `scheduled_time`은 24시간제 `HH:mm` 또는 `null`이며, 시간이 언급되지 않은 마감 일정에는 임의 시간을 생성하지 않음
 - 수동 일정과 Memo 기반 일정 생성 지원
 - 월별 일정 및 D-3 미완료 일정 조회 지원
 
@@ -173,9 +176,11 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 - 회원가입 및 JWT 로그인
 - 월별 캘린더와 날짜별 일정 조회
 - 일정 생성·수정·완료·삭제
+- 수동 입력 시간과 AI가 추출한 시간을 캘린더 셀·날짜별 상세·분석 제안에 표시
 - 메모장 단독 화면과 입력 중단 후 자동 저장
+- 연속 입력·메모 전환 시 단일 저장 요청만 실행하고 저장 중 전환을 제한해 생성/수정 순서 보장
 - 사용자 요청으로 AI 분석 시작 및 상태 자동 폴링
-- AI 일정 제안 확인 후 Schedule 확정
+- AI 일정 제안 확인 후 Schedule 확정 및 캘린더 데이터 즉시 재조회
 - 데스크톱·모바일 반응형 레이아웃
 
 로컬 개발 서버는 `/api` 요청을 Spring Boot의 `localhost:8080`으로 프록시하므로 별도의 CORS 설정 없이 연동할 수 있습니다.
@@ -212,6 +217,9 @@ npm run dev
 | Schedule | POST | `/api/v1/schedules` | 수동/컨펌 Schedule 생성 |
 | Schedule | GET | `/api/v1/schedules?year=2026&month=8` | 회원의 월별 Schedule 조회 |
 | Schedule | GET | `/api/v1/schedules/curations` | D-3 미완료 Schedule 조회 |
+| Schedule | GET | `/api/v1/schedules/{scheduleId}` | Schedule 단건 조회 |
+| Schedule | PATCH | `/api/v1/schedules/{scheduleId}` | Schedule 제목·날짜·시간·장소·메모 수정 |
+| Schedule | PATCH | `/api/v1/schedules/{scheduleId}/completion` | Schedule 완료 상태 변경 |
 | Schedule | DELETE | `/api/v1/schedules/{scheduleId}` | Schedule 삭제 |
 
 ## 테스트 전략
@@ -233,7 +241,7 @@ cd DoQuest-server
 현재 검증 결과:
 
 ```text
-56 tests completed
+57 tests completed
 0 failures
 0 errors
 ```
@@ -292,8 +300,9 @@ cd DoQuest-server
 <summary><strong>Spring-FastAPI DTO 계약 불일치</strong></summary>
 
 - Snake case JSON과 Java record 필드의 역직렬화 누락 확인
-- `memo_id`, `scheduled_at`, `location`, `summary_info`, `action_links` 계약 통일
+- `memo_id`, `scheduled_at`, `scheduled_time`, `location`, `summary_info`, `action_links` 계약 통일
 - `@JsonProperty`와 Pydantic 스키마를 1:1로 맞추고 RestClient 슬라이스 테스트로 고정
+- 시간은 FastAPI `HH:mm` → Spring `LocalTime` → React `scheduledTime`으로 전달하고 잘못된 형식은 서버에서 거부
 
 </details>
 
@@ -306,6 +315,45 @@ cd DoQuest-server
 
 </details>
 
+<details>
+<summary><strong>메모 자동 저장 요청 경합과 연속 생성 오류</strong></summary>
+
+- 입력 중단 자동 저장 중 새 메모를 연속 생성하거나 빠르게 전환하면 저장 effect가 서로 다른 Memo ID와 content를 참조하며 요청이 중첩
+- 세 번째 메모부터 브라우저에서 `The string did not match the expected pattern` 오류가 발생하고 저장 상태가 불명확해지는 현상 재현
+- `saveInFlight`로 동시 저장을 차단하고, 요청 시작 시점의 ID/content 스냅샷을 사용하도록 변경
+- 저장되지 않은 변경이나 진행 중인 요청이 있으면 메모 전환·새 메모 생성을 잠가 순서를 보장
+- UI의 저장 상태를 `saving / saved / error`로 분리하고 실패 시 다시 저장할 수 있도록 구성
+
+</details>
+
+<details>
+<summary><strong>일정 확정 후 새로고침 전까지 캘린더가 갱신되지 않음</strong></summary>
+
+- Schedule 생성 API는 성공했지만 프론트의 월간 일정 상태가 기존 배열을 유지해 화면에는 즉시 나타나지 않음
+- 확정 성공 콜백에서 월간 Schedule과 Memo를 다시 조회하도록 캐시 무효화 지점을 명시
+- AI 분석 결과는 상태 폴링, 일정 확정 결과는 즉시 재조회로 분리해 새로고침 의존 제거
+
+</details>
+
+## 메모 저장과 일정 등록 UX 결정
+
+MVP에서는 “입력을 멈추면 모든 메모를 자동 분석·자동 등록”하는 방식과 “사용자가 버튼으로 AI 분석을 요청하고 확정”하는 방식을 비교했습니다.
+
+자동 등록 방식은 입력 흐름이 빠르지만 모든 메모에 LLM 비용이 발생하고, 오탐 일정이 캘린더에 쌓이며, 메모 삭제 시 Schedule 연쇄 삭제 정책까지 즉시 결정해야 합니다. 반면 명시적 분석 방식은 한 번의 사용자 동작이 추가되지만 분석 의도가 분명하고 AI 제안을 등록 전에 검토할 수 있습니다.
+
+따라서 현재는 다음 경계를 채택했습니다.
+
+```text
+메모 입력 중단 → Memo 자동 저장
+사용자 ‘AI로 일정 찾기’ → 비동기 분석
+AI 후보 자동 표시 → 사용자 확정 → Schedule 생성
+```
+
+- 메모 저장은 빠르고 예측 가능한 기본 기능으로 유지
+- LLM 호출 시점을 사용자가 통제해 불필요한 호출과 비용 방지
+- AI 오탐을 `MemoAnalysis` 제안 단계에서 차단
+- 한 메모의 복수 일정 추출은 MVP 이후 후보 배열과 부분 확정 모델로 확장
+
 ## 로드맵
 
 - [x] Spring 핵심 도메인과 JWT 인증
@@ -316,6 +364,8 @@ cd DoQuest-server
 - [x] Schedule 수정·단건 조회·완료 상태 API
 - [x] 캘린더·메모장 단독 프론트와 메모 자동 저장
 - [x] 명시적 AI 분석 시작과 결과 자동 폴링
+- [x] 선택형 일정 시간 추출·저장·입력·캘린더 표시
+- [x] 메모 자동 저장 요청 직렬화와 확정 후 캘린더 즉시 갱신
 - [ ] 운영 DB 선정, 마이그레이션, 실제 DB 재검증
 - [ ] 실패 AI 작업 retry/outbox 도입
 - [ ] 펫과 퀘스트 단독 화면
@@ -348,6 +398,7 @@ cd DoQuest-server
 | 2026.08.28 | 성능·장애 실험 및 Two-Phase 분석 확정 흐름 구현 |
 | 2026.08.28 | Two-Phase 정상 흐름·중복 확정·확정 Memo 삭제 HTTP E2E 검증 |
 | 2026.08.29 | 캘린더·메모장 단독 화면, 자동 저장, 명시적 AI 분석 및 자동 폴링 구현 |
+| 2026.08.31 | 메모 저장 직렬화, 확정 후 즉시 갱신, 선택형 일정 시간 필드 End-to-End 연동 |
 
 </details>
 
