@@ -39,7 +39,7 @@ public class ScheduleService {
         }
 
         Schedule schedule = Schedule.createSchedule(
-                member, memo, request.title(), request.scheduledAt(), request.location(), request.summaryInfo()
+                member, memo, request.title(), request.scheduledAt(), request.scheduledTime(), request.location(), request.summaryInfo()
         );
 
         return ScheduleResponse.from(scheduleRepository.save(schedule));
@@ -62,7 +62,7 @@ public class ScheduleService {
     @Transactional
     public ScheduleResponse updateSchedule(Long memberId, Long scheduleId, ScheduleUpdateRequest request) {
         Schedule schedule = findOwnedSchedule(memberId, scheduleId);
-        schedule.update(request.title(), request.scheduledAt(), request.location(), request.summaryInfo());
+        schedule.update(request.title(), request.scheduledAt(), request.scheduledTime(), request.location(), request.summaryInfo());
         return ScheduleResponse.from(schedule);
     }
 

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,17 +40,19 @@ class ScheduleTest {
             Memo memo = createTestMemo(member);
             String title = "코딩테스트";
             LocalDate scheduledAt = LocalDate.of(2026, 8, 28);
+            LocalTime scheduledTime = LocalTime.of(19, 30);
             String location = "온라인";
             String summaryInfo = "프로그래머스 환경";
 
             // when
-            Schedule schedule = Schedule.createSchedule(member, memo, title, scheduledAt, location, summaryInfo);
+            Schedule schedule = Schedule.createSchedule(member, memo, title, scheduledAt, scheduledTime, location, summaryInfo);
 
             // then
             assertThat(schedule.getMember()).isEqualTo(member);
             assertThat(schedule.getMemo()).isEqualTo(memo);
             assertThat(schedule.getTitle()).isEqualTo(title);
             assertThat(schedule.getScheduledAt()).isEqualTo(scheduledAt);
+            assertThat(schedule.getScheduledTime()).isEqualTo(scheduledTime);
             assertThat(schedule.getLocation()).isEqualTo(location);
             assertThat(schedule.getSummaryInfo()).isEqualTo(summaryInfo);
             assertThat(schedule.isCompleted()).isFalse();

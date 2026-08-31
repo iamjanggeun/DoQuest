@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import static jakarta.persistence.EnumType.STRING;
 import static jakarta.persistence.FetchType.LAZY;
@@ -43,6 +44,8 @@ public class MemoAnalysis extends BaseTimeEntity {
 
     private LocalDate scheduledAt;
 
+    private LocalTime scheduledTime;
+
     @Column(length = 100)
     private String location;
 
@@ -56,14 +59,20 @@ public class MemoAnalysis extends BaseTimeEntity {
         return analysis;
     }
 
-    public void complete(boolean scheduleCandidate, String title, LocalDate scheduledAt,
+    public void complete(boolean scheduleCandidate, String title, LocalDate scheduledAt, LocalTime scheduledTime,
                          String location, String summaryInfo) {
         this.scheduleCandidate = scheduleCandidate;
         this.title = title;
         this.scheduledAt = scheduledAt;
+        this.scheduledTime = scheduledTime;
         this.location = location;
         this.summaryInfo = summaryInfo;
         this.status = MemoAnalysisStatus.SUCCEEDED;
+    }
+
+    public void complete(boolean scheduleCandidate, String title, LocalDate scheduledAt,
+                         String location, String summaryInfo) {
+        complete(scheduleCandidate, title, scheduledAt, null, location, summaryInfo);
     }
 
     public void fail() {
@@ -75,6 +84,7 @@ public class MemoAnalysis extends BaseTimeEntity {
         this.scheduleCandidate = false;
         this.title = null;
         this.scheduledAt = null;
+        this.scheduledTime = null;
         this.location = null;
         this.summaryInfo = null;
         this.memo.resetParsed();

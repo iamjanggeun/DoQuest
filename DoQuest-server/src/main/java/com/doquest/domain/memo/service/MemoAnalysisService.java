@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 
 @Service
@@ -52,7 +53,8 @@ public class MemoAnalysisService {
     public void completeAnalysis(Long memoId, AiParserDto.Response response) {
         MemoAnalysis analysis = findAnalysis(memoId);
         LocalDate scheduledAt = parseScheduledAt(response.scheduledAt());
-        analysis.complete(response.isSchedule(), response.title(), scheduledAt,
+        LocalTime scheduledTime = parseScheduledTime(response.scheduledTime());
+        analysis.complete(response.isSchedule(), response.title(), scheduledAt, scheduledTime,
                 response.location(), response.summaryInfo());
         analysis.getMemo().markAsParsed();
     }
@@ -81,6 +83,7 @@ public class MemoAnalysisService {
                         memoId,
                         analysis.getTitle(),
                         analysis.getScheduledAt(),
+                        analysis.getScheduledTime(),
                         analysis.getLocation(),
                         analysis.getSummaryInfo()
                 )
@@ -118,6 +121,17 @@ public class MemoAnalysisService {
             return LocalDate.parse(value);
         } catch (DateTimeParseException e) {
             throw new BusinessException(ErrorCode.INVALID_SCHEDULE_DATE);
+        }
+    }
+
+    private LocalTime parseScheduledTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(value);
+        } catch (DateTimeParseException e) {
+            throw new BusinessException(ErrorCode.INVALID_SCHEDULE_TIME);
         }
     }
 }

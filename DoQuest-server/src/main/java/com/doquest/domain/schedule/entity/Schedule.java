@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 import static jakarta.persistence.FetchType.LAZY;
 import static jakarta.persistence.GenerationType.IDENTITY;
@@ -45,6 +46,9 @@ public class Schedule extends BaseTimeEntity {
     @Column(name = "scheduled_at", nullable = false)
     private LocalDate scheduledAt;
 
+    @Column(name = "scheduled_time")
+    private LocalTime scheduledTime;
+
     @Column(length = 100)
     private String location;
 
@@ -60,6 +64,7 @@ public class Schedule extends BaseTimeEntity {
             Memo memo,
             String title,
             LocalDate scheduledAt,
+            LocalTime scheduledTime,
             String location,
             String summaryInfo
     ) {
@@ -75,22 +80,33 @@ public class Schedule extends BaseTimeEntity {
         schedule.memo = memo;
         schedule.title = title;
         schedule.scheduledAt = scheduledAt;
+        schedule.scheduledTime = scheduledTime;
         schedule.location = location;
         schedule.summaryInfo = summaryInfo;
         schedule.isCompleted = false;
         return schedule;
     }
 
+    public static Schedule createSchedule(Member member, Memo memo, String title, LocalDate scheduledAt,
+                                          String location, String summaryInfo) {
+        return createSchedule(member, memo, title, scheduledAt, null, location, summaryInfo);
+    }
+
     // == 비즈니스 로직 == //
-    public void update(String title, LocalDate scheduledAt, String location, String summaryInfo) {
+    public void update(String title, LocalDate scheduledAt, LocalTime scheduledTime, String location, String summaryInfo) {
         if (title != null && !title.trim().isEmpty()) {
             this.title = title;
         }
         if (scheduledAt != null) {
             this.scheduledAt = scheduledAt;
         }
+        this.scheduledTime = scheduledTime;
         this.location = location;
         this.summaryInfo = summaryInfo;
+    }
+
+    public void update(String title, LocalDate scheduledAt, String location, String summaryInfo) {
+        update(title, scheduledAt, null, location, summaryInfo);
     }
 
     public void changeCompletion(boolean completed) {

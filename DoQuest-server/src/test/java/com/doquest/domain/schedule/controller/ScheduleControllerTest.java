@@ -20,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collections;
 
 import static org.mockito.BDDMockito.given;
@@ -75,12 +76,12 @@ class ScheduleControllerTest {
         Long scheduleId = 100L;
         setMockAuthentication(memberId);
         ScheduleUpdateRequest request = new ScheduleUpdateRequest(
-                "수정 일정", LocalDate.of(2026, 9, 1), "강남", "수정 요약"
+                "수정 일정", LocalDate.of(2026, 9, 1), LocalTime.of(19, 30), "강남", "수정 요약"
         );
         given(scheduleService.updateSchedule(memberId, scheduleId, request))
                 .willReturn(new ScheduleResponse(
                         scheduleId, null, request.title(), request.scheduledAt(),
-                        request.location(), request.summaryInfo(), false
+                        request.scheduledTime(), request.location(), request.summaryInfo(), false
                 ));
 
         mockMvc.perform(patch("/api/v1/schedules/{scheduleId}", scheduleId)
@@ -88,7 +89,8 @@ class ScheduleControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("수정 일정"))
-                .andExpect(jsonPath("$.scheduledAt").value("2026-09-01"));
+                .andExpect(jsonPath("$.scheduledAt").value("2026-09-01"))
+                .andExpect(jsonPath("$.scheduledTime").value("19:30"));
     }
 
     @Test

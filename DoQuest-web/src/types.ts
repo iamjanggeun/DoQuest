@@ -3,6 +3,7 @@ export type Schedule = {
   memoId: number | null
   title: string
   scheduledAt: string
+  scheduledTime: string | null
   location: string | null
   summaryInfo: string | null
   isCompleted: boolean
@@ -23,8 +24,9 @@ export type MemoAnalysis = {
   isSchedule: boolean
   title: string | null
   scheduledAt: string | null
+  scheduledTime: string | null
   location: string | null
   summaryInfo: string | null
 }
 
-export type ScheduleInput = Pick<Schedule, 'title' | 'scheduledAt' | 'location' | 'summaryInfo'>
+export type ScheduleInput = Pick<Schedule, 'title' | 'scheduledAt' | 'scheduledTime' | 'location' | 'summaryInfo'>

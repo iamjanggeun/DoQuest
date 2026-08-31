@@ -22,6 +22,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -69,7 +70,7 @@ class MemoAnalysisServiceTest {
     void completeAnalysis_성공() {
         MemoAnalysis analysis = createPendingAnalysis(1L, 10L);
         AiParserDto.Response response = new AiParserDto.Response(
-                true, "기술 면접", "2026-08-30", "선릉",
+                true, "기술 면접", "2026-08-30", "14:30", "선릉",
                 "면접 준비", List.of()
         );
         given(memoAnalysisRepository.findByMemoId(10L)).willReturn(Optional.of(analysis));
@@ -78,7 +79,22 @@ class MemoAnalysisServiceTest {
 
         assertThat(analysis.getStatus()).isEqualTo(MemoAnalysisStatus.SUCCEEDED);
         assertThat(analysis.getScheduledAt()).isEqualTo(LocalDate.of(2026, 8, 30));
+        assertThat(analysis.getScheduledTime()).isEqualTo(LocalTime.of(14, 30));
         assertThat(analysis.getMemo().isParsed()).isTrue();
+    }
+
+    @Test
+    void completeAnalysis_잘못된시간형식_예외() {
+        MemoAnalysis analysis = createPendingAnalysis(1L, 10L);
+        AiParserDto.Response response = new AiParserDto.Response(
+                true, "기술 면접", "2026-08-30", "오후 두 시", "선릉",
+                "면접 준비", List.of()
+        );
+        given(memoAnalysisRepository.findByMemoId(10L)).willReturn(Optional.of(analysis));
+
+        assertThatThrownBy(() -> memoAnalysisService.completeAnalysis(10L, response))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_SCHEDULE_TIME);
     }
 
     @Test

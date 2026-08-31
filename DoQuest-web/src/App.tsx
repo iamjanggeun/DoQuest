@@ -7,7 +7,9 @@ import { ApiError, api, session } from './api'
 import type { Memo, MemoAnalysis, Schedule, ScheduleInput } from './types'
 
 const weekdayNames = ['일', '월', '화', '수', '목', '금', '토']
-const emptyInput = (date: string): ScheduleInput => ({ title: '', scheduledAt: date, location: '', summaryInfo: '' })
+const emptyInput = (date: string): ScheduleInput => ({ title: '', scheduledAt: date, scheduledTime: null, location: '', summaryInfo: '' })
+
+const displayTime = (value: string | null) => value?.slice(0, 5)
 
 function formatMonth(date: Date) {
   return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long' }).format(date)
@@ -158,7 +160,7 @@ function Workspace({ onLogout }: { onLogout: () => void }) {
           {loading ? <Empty icon={<LoaderCircle className="spin"/>} title="일정을 불러오는 중"/> : selectedSchedules.length === 0 ? <Empty icon={<CalendarDays/>} title="아직 일정이 없어요" body="이 날에 새로운 퀘스트를 추가해보세요."/> : selectedSchedules.map(item =>
             <article className={`schedule-card ${item.isCompleted ? 'completed' : ''}`} key={item.scheduleId} onClick={() => setEditing(item)}>
               <button className="check-button" aria-label="완료 상태 변경" onClick={e => { e.stopPropagation(); void toggle(item) }}>{item.isCompleted && <Check size={15}/>}</button>
-              <div><h3>{item.title}</h3>{item.location && <p><MapPin size={14}/>{item.location}</p>}{item.summaryInfo && <span>{item.summaryInfo}</span>}</div>
+              <div><h3>{item.title}</h3>{item.scheduledTime && <p><Clock3 size={14}/>{displayTime(item.scheduledTime)}</p>}{item.location && <p><MapPin size={14}/>{item.location}</p>}{item.summaryInfo && <span>{item.summaryInfo}</span>}</div>
             </article>)}
         </div>
         <button className="memo-cta" onClick={() => setView('memos')}><span><Sparkles/></span><div><b>떠오른 일이 있나요?</b><small>메모장에서 일정을 찾아보세요</small></div><ArrowRight/></button>
@@ -189,13 +191,13 @@ function CalendarGrid({ month, schedules, selectedDate, onSelect, onOpen }: { mo
     {weekdayNames.map(day => <div className="weekday" key={day}>{day}</div>)}
     {cells.map((cell, index) => cell ? <button className={`day-cell ${cell.key === selectedDate ? 'selected' : ''} ${cell.key === todayKey() ? 'today' : ''}`} key={cell.key} onClick={() => onSelect(cell.key)}>
       <span className="date-number">{cell.day}</span>
-      <div className="cell-events">{schedules.filter(item => item.scheduledAt === cell.key).slice(0, 3).map(item => <span key={item.scheduleId} className={item.isCompleted ? 'done' : ''} onClick={e => {e.stopPropagation(); onOpen(item)}}><i/>{item.title}</span>)}</div>
+      <div className="cell-events">{schedules.filter(item => item.scheduledAt === cell.key).slice(0, 3).map(item => <span key={item.scheduleId} className={item.isCompleted ? 'done' : ''} onClick={e => {e.stopPropagation(); onOpen(item)}}><i/>{displayTime(item.scheduledTime) && `${displayTime(item.scheduledTime)} `}{item.title}</span>)}</div>
     </button> : <div className="day-cell empty-cell" key={index}/>) }
   </div>
 }
 
 function ScheduleModal({ value, date, onClose, onSaved, onDelete }: { value: Schedule | null; date: string; onClose: () => void; onSaved: () => void; onDelete: (value: Schedule) => void }) {
-  const [form, setForm] = useState<ScheduleInput>(value ? { title: value.title, scheduledAt: value.scheduledAt, location: value.location ?? '', summaryInfo: value.summaryInfo ?? '' } : emptyInput(date))
+  const [form, setForm] = useState<ScheduleInput>(value ? { title: value.title, scheduledAt: value.scheduledAt, scheduledTime: displayTime(value.scheduledTime) ?? null, location: value.location ?? '', summaryInfo: value.summaryInfo ?? '' } : emptyInput(date))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   async function submit(event: FormEvent) {
@@ -212,7 +214,8 @@ function ScheduleModal({ value, date, onClose, onSaved, onDelete }: { value: Sch
     <form className="modal" onSubmit={submit}>
       <div className="modal-head"><div><p className="eyebrow">SCHEDULE</p><h2>{value ? '일정 다듬기' : '새 일정 만들기'}</h2></div><button type="button" className="icon-button" onClick={onClose}><X/></button></div>
       <label>일정 이름<input autoFocus required value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="무엇을 할 예정인가요?"/></label>
-      <div className="form-row"><label>날짜<input type="date" required value={form.scheduledAt} onChange={e => setForm({...form, scheduledAt: e.target.value})}/></label><label>장소<input value={form.location ?? ''} onChange={e => setForm({...form, location: e.target.value})} placeholder="선택 입력"/></label></div>
+      <div className="form-row"><label>날짜<input type="date" required value={form.scheduledAt} onChange={e => setForm({...form, scheduledAt: e.target.value})}/></label><label>시간<input type="time" value={form.scheduledTime ?? ''} onChange={e => setForm({...form, scheduledTime: e.target.value || null})}/></label></div>
+      <label>장소<input value={form.location ?? ''} onChange={e => setForm({...form, location: e.target.value})} placeholder="선택 입력"/></label>
       <label>메모<textarea rows={4} value={form.summaryInfo ?? ''} onChange={e => setForm({...form, summaryInfo: e.target.value})} placeholder="준비물이나 참고할 내용을 적어주세요."/></label>
       {error && <p className="error-message">{error}</p>}
       <div className="modal-actions">{value && <button className="danger" type="button" onClick={() => onDelete(value)}><Trash2 size={16}/>삭제</button>}<span/><button className="outline" type="button" onClick={onClose}>취소</button><button className="primary" disabled={saving}>{saving && <LoaderCircle className="spin" size={16}/>}저장</button></div>
@@ -361,7 +364,7 @@ function AnalysisView({ value, onRefresh, onConfirm }: { value: MemoAnalysis; on
   if (value.status === 'PENDING') return <Empty icon={<Clock3/>} title="AI가 읽고 있어요" body="잠시 뒤 결과를 다시 확인해주세요." action={<button className="outline" onClick={onRefresh}>새로고침</button>}/>
   if (value.status === 'FAILED') return <Empty icon={<X/>} title="분석하지 못했어요" body="원본 메모는 안전하게 보관되어 있습니다."/>
   if (!value.isSchedule) return <Empty icon={<Sparkles/>} title="일정이 아닌 메모예요" body="메모로 보관하고 필요할 때 다시 확인하세요."/>
-  return <div className="analysis-result"><span className={`status-badge ${value.status.toLowerCase()}`}>{value.status === 'CONFIRMED' ? '캘린더 등록 완료' : 'AI 일정 제안'}</span><h3>{value.title}</h3><p><CalendarDays/>{value.scheduledAt}</p>{value.location && <p><MapPin/>{value.location}</p>}{value.summaryInfo && <blockquote>{value.summaryInfo}</blockquote>}<button className="primary wide" disabled={value.status === 'CONFIRMED'} onClick={onConfirm}>{value.status === 'CONFIRMED' ? <><Check/>등록된 일정</> : '이 일정으로 확정하기'}</button></div>
+  return <div className="analysis-result"><span className={`status-badge ${value.status.toLowerCase()}`}>{value.status === 'CONFIRMED' ? '캘린더 등록 완료' : 'AI 일정 제안'}</span><h3>{value.title}</h3><p><CalendarDays/>{value.scheduledAt}{value.scheduledTime && ` ${displayTime(value.scheduledTime)}`}</p>{value.location && <p><MapPin/>{value.location}</p>}{value.summaryInfo && <blockquote>{value.summaryInfo}</blockquote>}<button className="primary wide" disabled={value.status === 'CONFIRMED'} onClick={onConfirm}>{value.status === 'CONFIRMED' ? <><Check/>등록된 일정</> : '이 일정으로 확정하기'}</button></div>
 }
 
 function Empty({ icon, title, body, action }: { icon: React.ReactNode; title: string; body?: string; action?: React.ReactNode }) {
