@@ -7,7 +7,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 import static jakarta.persistence.FetchType.LAZY;
 import static jakarta.persistence.GenerationType.IDENTITY;
@@ -49,18 +49,23 @@ public class Quest extends BaseTimeEntity {
     private int rewardExp;
 
     @Column(nullable = false)
-    private LocalDateTime startedAt; // 30분 타이머 가드레일 검증용 시각
+    private Instant startedAt; // 서버 시간대와 무관한 30분 타이머 가드레일 기준 시각
 
     // == Factory Method == //
-    public static Quest createQuest(Member member, String title, QuestCategory category, int rewardExp) {
+    public static Quest createQuest(Member member, String title, QuestCategory category, int rewardExp,
+                                    Instant startedAt) {
         Quest quest = new Quest();
         quest.member = member;
         quest.title = title;
         quest.category = category;
         quest.rewardExp = rewardExp;
         quest.status = QuestStatus.IN_PROGRESS; // 생성 시 자동 진행 중 상태
-        quest.startedAt = LocalDateTime.now();  // 생성 직후 30분 타이머 시작
+        quest.startedAt = startedAt;
         return quest;
+    }
+
+    public static Quest createQuest(Member member, String title, QuestCategory category, int rewardExp) {
+        return createQuest(member, title, category, rewardExp, Instant.now());
     }
 
     // == 비즈니스 로직 == //

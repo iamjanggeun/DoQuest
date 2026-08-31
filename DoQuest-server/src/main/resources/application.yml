@@ -2,35 +2,17 @@ spring:
   application:
     name: DoQuest-server
   profiles:
-    active: local
+    default: local
   config:
     import:
-      - classpath:application-secret.yml # Spring Boot 3.x 표준: 시크릿 파일 명시적 임포트
-
----
-# 로컬 개발 및 E2E 테스트용 프로파일 (H2 In-Memory)
-spring:
-  config:
-    activate:
-      on-profile: local
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:doquest;MODE=MySQL;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+      - optional:classpath:application-secret.yml
   jpa:
     open-in-view: false
-    hibernate:
-      ddl-auto: update # 엔티티 기반 로컬 테이블 자동 생성
     properties:
       hibernate:
-        format_sql: true
-        show_sql: true
-        default_batch_fetch_size: 100 # 글로벌 배치 사이즈 설정 (N+1 문제 방어)
+        default_batch_fetch_size: 100
+        jdbc:
+          time_zone: UTC
 
 ai:
   service:

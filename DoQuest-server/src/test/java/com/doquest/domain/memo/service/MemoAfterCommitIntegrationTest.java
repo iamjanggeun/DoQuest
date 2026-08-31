@@ -5,6 +5,8 @@ import com.doquest.domain.ai.dto.AiParserDto;
 import com.doquest.domain.member.entity.Member;
 import com.doquest.domain.member.repository.MemberRepository;
 import com.doquest.domain.memo.entity.Memo;
+import com.doquest.domain.memo.entity.MemoAnalysisStatus;
+import com.doquest.domain.memo.repository.MemoAnalysisRepository;
 import com.doquest.domain.memo.repository.MemoRepository;
 import com.doquest.domain.pet.entity.Pet;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,9 +14,15 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -30,9 +38,24 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "jwt.secret=test-secret-key-must-be-at-least-32-bytes-long",
+        "jwt.access-token-expiration=3600000"
+})
+@ActiveProfiles("postgres-test")
+@Testcontainers(disabledWithoutDocker = true)
 @DisplayName("Memo AFTER_COMMIT 통합 테스트")
 class MemoAfterCommitIntegrationTest {
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @DynamicPropertySource
+    static void postgresProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+    }
 
     @Autowired
     private MemoService memoService;
@@ -45,6 +68,9 @@ class MemoAfterCommitIntegrationTest {
 
     @Autowired
     private MemoRepository memoRepository;
+
+    @Autowired
+    private MemoAnalysisRepository memoAnalysisRepository;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
@@ -105,6 +131,7 @@ class MemoAfterCommitIntegrationTest {
                 .get()
                 .extracting(Memo::isParsed)
                 .isEqualTo(false);
+        assertThat(awaitAnalysisStatus(memoId, MemoAnalysisStatus.FAILED)).isTrue();
     }
 
     @Test
@@ -140,6 +167,19 @@ class MemoAfterCommitIntegrationTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
         while (System.nanoTime() < deadline) {
             if (memoRepository.findById(memoId).map(Memo::isParsed).orElse(false)) {
+                return true;
+            }
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private boolean awaitAnalysisStatus(Long memoId, MemoAnalysisStatus expected) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (System.nanoTime() < deadline) {
+            if (memoAnalysisRepository.findByMemoId(memoId)
+                    .map(analysis -> analysis.getStatus() == expected)
+                    .orElse(false)) {
                 return true;
             }
             Thread.sleep(20);

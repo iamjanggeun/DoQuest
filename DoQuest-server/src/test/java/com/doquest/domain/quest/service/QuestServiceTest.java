@@ -10,14 +10,16 @@ import com.doquest.domain.quest.repository.QuestRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -30,7 +32,6 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class QuestServiceTest {
 
-    @InjectMocks
     private QuestService questService;
 
     @Mock
@@ -41,6 +42,13 @@ class QuestServiceTest {
 
     @Mock
     private PetRepository petRepository;
+
+    private final Clock clock = Clock.fixed(Instant.parse("2026-08-31T00:00:00Z"), ZoneOffset.UTC);
+
+    @BeforeEach
+    void setUp() {
+        questService = new QuestService(questRepository, petRepository, memberRepository, clock);
+    }
 
     // 26.08.10 퀘스트 어뷰징 코드 추가하면서 퀘스트 엔티티 전면 개편
     // 새로운 테스트 코드
@@ -79,7 +87,7 @@ class QuestServiceTest {
         ReflectionTestUtils.setField(quest, "id", questId);
 
         // 💡 35분 전에 시작된 퀘스트로 타임스탬프 조작 (30분 쿨타임 가드레일 통과용)
-        ReflectionTestUtils.setField(quest, "startedAt", LocalDateTime.now().minusMinutes(35));
+        ReflectionTestUtils.setField(quest, "startedAt", Instant.now(clock).minusSeconds(35 * 60));
 
         given(questRepository.findById(questId)).willReturn(Optional.of(quest));
 
@@ -103,7 +111,7 @@ class QuestServiceTest {
 
         Quest quest = Quest.createQuest(member, "JPA 복습", QuestCategory.STUDY, 20);
         // 💡 방금(1분 전) 시작된 퀘스트
-        ReflectionTestUtils.setField(quest, "startedAt", LocalDateTime.now().minusMinutes(1));
+        ReflectionTestUtils.setField(quest, "startedAt", Instant.now(clock).minusSeconds(60));
 
         given(questRepository.findById(questId)).willReturn(Optional.of(quest));
 

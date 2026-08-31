@@ -22,7 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -108,8 +108,8 @@ class MemoControllerTest {
         setMockAuthentication(memberId);
 
         List<MemoResponse> responses = List.of(
-                new MemoResponse(1L, "첫 번째 메모", false, LocalDateTime.now()),
-                new MemoResponse(2L, "두 번째 메모", false, LocalDateTime.now())
+                new MemoResponse(1L, "첫 번째 메모", false, Instant.now()),
+                new MemoResponse(2L, "두 번째 메모", false, Instant.now())
         );
 
         given(memoService.getMemosByMemberId(memberId)).willReturn(responses);

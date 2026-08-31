@@ -15,7 +15,7 @@ import static jakarta.persistence.GenerationType.IDENTITY;
         name = "memos",
         indexes = {
                 // 특정 회원의 메모 목록 최신순 조회 인덱스 최적화
-                @Index(name = "idx_memos_member_created", columnList = "member_id, createdAt")
+                @Index(name = "idx_memos_member_created", columnList = "member_id, created_at")
         }
 )
 @Getter

@@ -14,7 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -25,6 +26,7 @@ public class QuestService {
     private final QuestRepository questRepository;
     private final PetRepository petRepository;
     private final MemberRepository memberRepository;
+    private final Clock clock;
 
     private static final int DEFAULT_REWARD_EXP = 20;
     private static final long COMPLETE_COOLDOWN_MINUTES = 30L; // 퀘스트 최소 수행 시간 (30분)
@@ -39,7 +41,7 @@ public class QuestService {
 
         // TODO: Phase 4에서 LangChain / Vector DB 연동하여 '시맨틱 중복 퀘스트' 검증 로직이 들어갈 자리
 
-        Quest quest = Quest.createQuest(member, title, category, DEFAULT_REWARD_EXP);
+        Quest quest = Quest.createQuest(member, title, category, DEFAULT_REWARD_EXP, Instant.now(clock));
         Quest savedQuest = questRepository.save(quest);
 
         return savedQuest.getId();
@@ -91,7 +93,7 @@ public class QuestService {
             throw new BusinessException(ErrorCode.QUEST_NOT_IN_PROGRESS);
         }
 
-        long minutes = Duration.between(quest.getStartedAt(), LocalDateTime.now()).toMinutes();
+        long minutes = Duration.between(quest.getStartedAt(), Instant.now(clock)).toMinutes();
         if (minutes < COMPLETE_COOLDOWN_MINUTES) {
             throw new BusinessException(ErrorCode.QUEST_COMPLETE_TOO_FAST);
         }

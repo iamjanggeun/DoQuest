@@ -1,7 +1,6 @@
 package com.doquest.global.config.security;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -41,8 +40,7 @@ public class SecurityConfig {
 
                 // 요청별 인가(Authorization) 규칙 설정
                 .authorizeHttpRequests(auth -> auth
-                        // H2 콘솔 정적 리소스 및 서블릿 경로 허용
-                        .requestMatchers(PathRequest.toH2Console()).permitAll()
+                        // 로컬 프로파일에서만 활성화되는 H2 콘솔 경로 허용
                         .requestMatchers("/h2-console/**").permitAll()
                         // 인증 없이 허용할 화이트리스트 URL (회원가입, 로그인 등)
                         .requestMatchers("/api/v1/auth/**").permitAll()

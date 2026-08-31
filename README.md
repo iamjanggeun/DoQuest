@@ -20,15 +20,18 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 | 응답 지연 격리 | 평균 HTTP 응답 시간 `1,761.55ms → 9.46ms`, 약 `99.46%` 감소 |
 | 트랜잭션 경계 | `AFTER_COMMIT` 이후에만 AI 작업을 실행해 롤백된 Memo의 AI 호출 방지 |
 | 장애 격리 | FastAPI 종료 상태에서도 Memo 생성 `201 Created`, row 유지, `isParsed=false` 확인 |
+| 운영 DB 검증 | PostgreSQL 16.15, Flyway V1, Hibernate validate 및 Testcontainers 통합 검증 완료 |
 | Two-Phase UX | AI 분석을 `PENDING → SUCCEEDED/FAILED → CONFIRMED` 상태로 관리하고 사용자 확정 후 Schedule 생성 |
 | 중복 확정 방지 | 상태 검증과 낙관적 잠금으로 동일 분석 결과의 Schedule 중복 생성 방어 |
 | 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
 | 날짜·시간 계약 | `scheduled_at(YYYY-MM-DD)`과 선택형 `scheduled_time(HH:mm)`을 분리해 FastAPI-Spring-React End-to-End 연동 |
-| 테스트 | Spring 전체 `57 tests`, 실패 `0`, 오류 `0` |
+| 테스트 | Spring 전체 `58 tests`, 실패 `0`, 오류 `0` |
 
 성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
 자세한 실험 조건과 원시 측정값은 [동기·비동기 성능 및 장애 격리 검증](docs/ai-async-benchmark.md)에 기록했습니다.
+
+PostgreSQL 환경의 마이그레이션, `AFTER_COMMIT` 커밋·롤백, FastAPI 연결 장애와 복구 실험은 [PostgreSQL AFTER_COMMIT 및 장애 격리 검증](docs/postgresql-after-commit-failure-e2e.md)에 기록했습니다.
 
 ### Two-Phase HTTP E2E 결과
 
@@ -65,21 +68,21 @@ Memo 생성(201)
 flowchart LR
     Client[Client / Web UI]
     Spring[Spring Boot]
-    H2[(H2 Database)]
+    PostgreSQL[(PostgreSQL)]
     Event[AFTER_COMMIT Event]
     Worker[aiTaskExecutor]
     FastAPI[FastAPI / LangChain]
     OpenAI[OpenAI API]
 
     Client -->|JWT REST API| Spring
-    Spring -->|Memo commit| H2
+    Spring -->|Memo commit| PostgreSQL
     Spring -->|사용자 분석 요청 commit| Event
     Event --> Worker
     Worker -->|RestClient| FastAPI
     FastAPI --> OpenAI
     OpenAI --> FastAPI
     FastAPI -->|ScheduleMetadata| Worker
-    Worker -->|MemoAnalysis update| H2
+    Worker -->|MemoAnalysis update| PostgreSQL
 ```
 
 ### 메모 생성과 AI 후처리
@@ -159,15 +162,16 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 | 영역 | 기술 |
 |---|---|
 | Backend | Java 17, Spring Boot 3.5.16, Spring MVC |
-| Persistence | Spring Data JPA, Hibernate |
+| Persistence | Spring Data JPA, Hibernate, Flyway |
 | Security | Spring Security 6, JJWT, Stateless JWT |
 | Async / Integration | Spring Event, `@Async`, RestClient |
-| Local Database | H2 In-Memory, MySQL compatibility mode |
+| Local Database | H2 In-Memory, PostgreSQL compatibility mode |
+| Production Database | PostgreSQL 16 |
 | AI Service | FastAPI, LangChain LCEL, OpenAI Structured Output |
 | Frontend MVP | React, TypeScript, Vite, Lucide |
-| Testing | JUnit 5, AssertJ, Mockito, MockMvc, MockRestServiceServer |
+| Testing | JUnit 5, AssertJ, Mockito, MockMvc, MockRestServiceServer, Testcontainers |
 
-현재 H2로 개발·검증 중이며 운영 DB는 아직 선정·연동하지 않았습니다. 운영 DB 선정 후 Flyway 또는 Liquibase 기반 마이그레이션과 실제 DB 통합 테스트를 추가할 예정입니다.
+로컬의 빠른 개발은 H2로 유지하고, 운영 스키마는 PostgreSQL과 Flyway로 관리합니다. PostgreSQL Testcontainers에서 마이그레이션, JPA 매핑, `AFTER_COMMIT` 트랜잭션 경계를 검증합니다.
 
 ## Frontend MVP
 

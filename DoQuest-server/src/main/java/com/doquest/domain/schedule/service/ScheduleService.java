@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -26,6 +27,7 @@ public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
     private final MemberRepository memberRepository;
     private final MemoRepository memoRepository;
+    private final Clock clock;
 
     @Transactional
     public ScheduleResponse createSchedule(Long memberId, ScheduleCreateRequest request) {
@@ -74,7 +76,7 @@ public class ScheduleService {
     }
 
     public List<ScheduleResponse> getUpcomingCuration(Long memberId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         LocalDate dPlus3 = today.plusDays(3);
 
         return scheduleRepository.findUpcomingSchedules(memberId, today, dPlus3)

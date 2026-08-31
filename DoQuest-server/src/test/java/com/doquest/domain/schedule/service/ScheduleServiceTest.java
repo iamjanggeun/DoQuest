@@ -12,15 +12,18 @@ import com.doquest.domain.schedule.repository.ScheduleRepository;
 import com.doquest.global.error.BusinessException;
 import com.doquest.global.error.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -34,7 +37,6 @@ import static org.mockito.Mockito.verify;
 @DisplayName("ScheduleService 단위 테스트")
 class ScheduleServiceTest {
 
-    @InjectMocks
     private ScheduleService scheduleService;
 
     @Mock
@@ -45,6 +47,15 @@ class ScheduleServiceTest {
 
     @Mock
     private MemoRepository memoRepository;
+
+    private final Clock clock = Clock.fixed(
+            Instant.parse("2026-08-31T00:00:00Z"), ZoneId.of("Asia/Seoul")
+    );
+
+    @BeforeEach
+    void setUp() {
+        scheduleService = new ScheduleService(scheduleRepository, memberRepository, memoRepository, clock);
+    }
 
     private Member createMember(Long id) {
         Member member = Member.createMember("test@test.com", "1234", "Tester", null);
@@ -164,7 +175,7 @@ class ScheduleServiceTest {
             Long memberId = 1L;
             Member member = createMember(memberId);
             Schedule schedule = Schedule.createSchedule(
-                    member, null, "D-2 마감 과제", LocalDate.now().plusDays(2), null, null
+                    member, null, "D-2 마감 과제", LocalDate.now(clock).plusDays(2), null, null
             );
             ReflectionTestUtils.setField(schedule, "id", 1L);
 
