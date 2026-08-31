@@ -203,24 +203,26 @@ npm run dev
 
 | 도메인 | Method | Endpoint | 설명 |
 |---|---|---|---|
-| Auth | POST | `/api/v1/auth/signup` | 회원가입 |
-| Auth | POST | `/api/v1/auth/login` | 로그인 및 JWT 발급 |
-| Dashboard | GET | `/api/v1/dashboard` | Pet + 진행 중 Quest 통합 조회 |
-| Memo | POST | `/api/v1/memos` | Memo 생성 |
-| Memo | GET | `/api/v1/memos` | 회원의 Memo 목록 조회 |
-| Memo | PATCH | `/api/v1/memos/{memoId}` | Memo 수정 |
-| Memo | DELETE | `/api/v1/memos/{memoId}` | Memo 삭제 |
-| Analysis | POST | `/api/v1/memos/{memoId}/analysis` | 사용자 요청으로 비동기 AI 분석 시작 |
-| Analysis | GET | `/api/v1/memos/{memoId}/analysis` | AI 분석 상태와 결과 조회 |
-| Analysis | POST | `/api/v1/memos/{memoId}/analysis/confirm` | 분석 결과를 Schedule로 확정 |
-| Quest | POST | `/api/v1/quests` | Quest 생성 |
-| Schedule | POST | `/api/v1/schedules` | 수동/컨펌 Schedule 생성 |
-| Schedule | GET | `/api/v1/schedules?year=2026&month=8` | 회원의 월별 Schedule 조회 |
-| Schedule | GET | `/api/v1/schedules/curations` | D-3 미완료 Schedule 조회 |
-| Schedule | GET | `/api/v1/schedules/{scheduleId}` | Schedule 단건 조회 |
-| Schedule | PATCH | `/api/v1/schedules/{scheduleId}` | Schedule 제목·날짜·시간·장소·메모 수정 |
-| Schedule | PATCH | `/api/v1/schedules/{scheduleId}/completion` | Schedule 완료 상태 변경 |
-| Schedule | DELETE | `/api/v1/schedules/{scheduleId}` | Schedule 삭제 |
+| Auth | POST | [`/api/v1/auth/signup`](docs/api-reference.md#auth-signup) | 회원가입 |
+| Auth | POST | [`/api/v1/auth/login`](docs/api-reference.md#auth-login) | 로그인 및 JWT 발급 |
+| Dashboard | GET | [`/api/v1/dashboard`](docs/api-reference.md#dashboard-get) | Pet + 진행 중 Quest 통합 조회 |
+| Memo | POST | [`/api/v1/memos`](docs/api-reference.md#memo-create) | Memo 생성 |
+| Memo | GET | [`/api/v1/memos`](docs/api-reference.md#memo-list) | 회원의 Memo 목록 조회 |
+| Memo | PATCH | [`/api/v1/memos/{memoId}`](docs/api-reference.md#memo-update) | Memo 수정 |
+| Memo | DELETE | [`/api/v1/memos/{memoId}`](docs/api-reference.md#memo-delete) | Memo 삭제 |
+| Analysis | POST | [`/api/v1/memos/{memoId}/analysis`](docs/api-reference.md#analysis-request) | 사용자 요청으로 비동기 AI 분석 시작 |
+| Analysis | GET | [`/api/v1/memos/{memoId}/analysis`](docs/api-reference.md#analysis-get) | AI 분석 상태와 결과 조회 |
+| Analysis | POST | [`/api/v1/memos/{memoId}/analysis/confirm`](docs/api-reference.md#analysis-confirm) | 분석 결과를 Schedule로 확정 |
+| Quest | POST | [`/api/v1/quests`](docs/api-reference.md#quest-create) | Quest 생성 |
+| Schedule | POST | [`/api/v1/schedules`](docs/api-reference.md#schedule-create) | 수동/컨펌 Schedule 생성 |
+| Schedule | GET | [`/api/v1/schedules?year=2026&month=8`](docs/api-reference.md#schedule-monthly) | 회원의 월별 Schedule 조회 |
+| Schedule | GET | [`/api/v1/schedules/curations`](docs/api-reference.md#schedule-curations) | D-3 미완료 Schedule 조회 |
+| Schedule | GET | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-get) | Schedule 단건 조회 |
+| Schedule | PATCH | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-update) | Schedule 제목·날짜·시간·장소·메모 수정 |
+| Schedule | PATCH | [`/api/v1/schedules/{scheduleId}/completion`](docs/api-reference.md#schedule-completion) | Schedule 완료 상태 변경 |
+| Schedule | DELETE | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-delete) | Schedule 삭제 |
+
+전체 요청·응답 JSON과 오류 코드는 [API JSON Reference](docs/api-reference.md)에서 확인할 수 있습니다.
 
 ## 테스트 전략
 
