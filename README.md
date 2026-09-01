@@ -20,12 +20,13 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 | 응답 지연 격리 | 평균 HTTP 응답 시간 `1,761.55ms → 9.46ms`, 약 `99.46%` 감소 |
 | 트랜잭션 경계 | `AFTER_COMMIT` 이후에만 AI 작업을 실행해 롤백된 Memo의 AI 호출 방지 |
 | 장애 격리 | FastAPI 종료 상태에서도 Memo 생성 `201 Created`, row 유지, `isParsed=false` 확인 |
-| 운영 DB 검증 | PostgreSQL 16.15, Flyway V1, Hibernate validate 및 Testcontainers 통합 검증 완료 |
+| 운영 DB 검증 | PostgreSQL 16.15, Flyway V1·V2, Hibernate validate 및 Testcontainers 통합 검증 완료 |
 | Two-Phase UX | AI 분석을 `PENDING → SUCCEEDED/FAILED → CONFIRMED` 상태로 관리하고 사용자 확정 후 Schedule 생성 |
-| 중복 확정 방지 | 상태 검증과 낙관적 잠금으로 동일 분석 결과의 Schedule 중복 생성 방어 |
+| 실패 복구 | 일시적 네트워크·5xx·429 오류를 최대 3회 지수 백오프로 재시도하고 시도 횟수·최종 오류를 저장 |
+| 중복 확정 방지 | 상태 검증·낙관적 잠금과 `schedules.memo_id` 유니크 제약으로 동일 Memo의 Schedule 중복 생성 방어 |
 | 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
 | 날짜·시간 계약 | `scheduled_at(YYYY-MM-DD)`과 선택형 `scheduled_time(HH:mm)`을 분리해 FastAPI-Spring-React End-to-End 연동 |
-| 테스트 | Spring 전체 `58 tests`, 실패 `0`, 오류 `0` |
+| 테스트 | Spring 전체 `64 tests`, 실패 `0`, 오류 `0` |
 
 성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
@@ -105,7 +106,8 @@ MemoAnalysis(SUCCEEDED/FAILED) + Memo.isParsed 갱신
 - `AFTER_COMMIT`: 분석 요청 트랜잭션이 성공한 경우에만 AI 파이프라인 실행
 - `@Async`: 외부 LLM I/O를 HTTP 요청 스레드에서 분리
 - `REQUIRES_NEW`: AI 분석 결과를 독립 트랜잭션으로 반영
-- AI 장애 시 Memo 원본은 유지되지만 현재 자동 retry/outbox/DLQ는 제공하지 않음
+- 일시적 네트워크·5xx·429 장애는 최대 3회 지수 백오프로 재시도하고, 최종 실패 시 시도 횟수와 정제된 오류를 `MemoAnalysis`에 저장
+- `FAILED` 분석은 같은 API로 다시 요청하면 기존 결과를 초기화하고 재실행하며, outbox/DLQ는 제출 범위에서 제외
 
 ### Two-Phase 일정 등록
 
@@ -143,6 +145,7 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 - KST 기준 Temporal Grounding은 FastAPI에서 처리하고 Spring은 날짜를 `LocalDate`, 선택 시간을 `LocalTime`으로 검증·변환
 - `scheduled_time`은 24시간제 `HH:mm` 또는 `null`이며, 시간이 언급되지 않은 마감 일정에는 임의 시간을 생성하지 않음
 - 수동 일정과 Memo 기반 일정 생성 지원
+- Memo 기반 일정은 애플리케이션 선검사와 DB 유니크 제약을 함께 적용해 동시 요청에서도 한 건만 생성
 - 월별 일정 및 D-3 미완료 일정 조회 지원
 
 ### Quest / Pet
@@ -247,7 +250,7 @@ cd DoQuest-server
 현재 검증 결과:
 
 ```text
-57 tests completed
+64 tests completed
 0 failures
 0 errors
 ```
@@ -298,7 +301,8 @@ cd DoQuest-server
 - Memo 트랜잭션과 AI 후처리 트랜잭션을 분리
 - Mock 실패 테스트, 실제 트랜잭션 통합 테스트, FastAPI-down E2E를 각각 수행
 - 외부 AI 장애 시 Memo row와 Spring 가용성 유지 확인
-- 장애 격리는 구현했지만 자동 복구는 향후 과제로 명시
+- 네트워크·5xx·429 오류는 최대 3회 지수 백오프로 재시도하고 최종 실패 상태를 저장
+- 사용자는 `FAILED` 상태에서 같은 분석 API를 다시 호출해 복구 가능
 
 </details>
 
@@ -372,8 +376,9 @@ AI 후보 자동 표시 → 사용자 확정 → Schedule 생성
 - [x] 명시적 AI 분석 시작과 결과 자동 폴링
 - [x] 선택형 일정 시간 추출·저장·입력·캘린더 표시
 - [x] 메모 자동 저장 요청 직렬화와 확정 후 캘린더 즉시 갱신
-- [ ] 운영 DB 선정, 마이그레이션, 실제 DB 재검증
-- [ ] 실패 AI 작업 retry/outbox 도입
+- [x] PostgreSQL 운영 DB 선정, Flyway 마이그레이션, Testcontainers 재검증
+- [x] 실패 AI 작업 최소 복구: 3회 retry, 실패 기록, 사용자 재요청, Schedule 중복 방지
+- [ ] outbox/DLQ 기반 장기 복구
 - [ ] 펫과 퀘스트 단독 화면
 - [ ] Vector DB 기반 유사 Quest 가드레일
 - [ ] RAG, Docker Compose, CI/CD, 클라우드 배포
@@ -405,6 +410,7 @@ AI 후보 자동 표시 → 사용자 확정 → Schedule 생성
 | 2026.08.28 | Two-Phase 정상 흐름·중복 확정·확정 Memo 삭제 HTTP E2E 검증 |
 | 2026.08.29 | 캘린더·메모장 단독 화면, 자동 저장, 명시적 AI 분석 및 자동 폴링 구현 |
 | 2026.08.31 | 메모 저장 직렬화, 확정 후 즉시 갱신, 선택형 일정 시간 필드 End-to-End 연동 |
+| 2026.09.01 | AI 호출 재시도·실패 기록·사용자 재요청과 Memo 기반 Schedule DB 중복 방지 구현 |
 
 </details>
 

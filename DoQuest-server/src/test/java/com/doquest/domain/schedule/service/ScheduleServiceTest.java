@@ -88,7 +88,7 @@ class ScheduleServiceTest {
 
             given(memberRepository.findById(memberId)).willReturn(Optional.of(member));
             given(memoRepository.findByIdAndMemberId(memoId, memberId)).willReturn(Optional.of(memo));
-            given(scheduleRepository.save(any(Schedule.class))).willReturn(savedSchedule);
+            given(scheduleRepository.saveAndFlush(any(Schedule.class))).willReturn(savedSchedule);
 
             // when
             ScheduleResponse response = scheduleService.createSchedule(memberId, request);
@@ -98,7 +98,7 @@ class ScheduleServiceTest {
             assertThat(response.scheduleId()).isEqualTo(100L);
             assertThat(response.memoId()).isEqualTo(memoId);
             assertThat(response.title()).isEqualTo("기술 면접");
-            verify(scheduleRepository).save(any(Schedule.class));
+            verify(scheduleRepository).saveAndFlush(any(Schedule.class));
         }
 
         @Test
@@ -115,6 +115,22 @@ class ScheduleServiceTest {
             assertThatThrownBy(() -> scheduleService.createSchedule(memberId, request))
                     .isInstanceOf(BusinessException.class)
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MEMBER_NOT_FOUND);
+        }
+
+        @Test
+        @DisplayName("[예외] 같은 메모로 이미 생성된 일정이 있으면 중복 생성을 차단한다.")
+        void createSchedule_DuplicateMemo_ThrowsException() {
+            Long memberId = 1L;
+            Long memoId = 10L;
+            ScheduleCreateRequest request = new ScheduleCreateRequest(
+                    memoId, "기술 면접", LocalDate.of(2026, 9, 2), null, null
+            );
+            given(memberRepository.findById(memberId)).willReturn(Optional.of(createMember(memberId)));
+            given(scheduleRepository.existsByMemoId(memoId)).willReturn(true);
+
+            assertThatThrownBy(() -> scheduleService.createSchedule(memberId, request))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SCHEDULE_ALREADY_EXISTS_FOR_MEMO);
         }
     }
 

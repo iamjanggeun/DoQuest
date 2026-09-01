@@ -1,7 +1,6 @@
 package com.doquest.domain.memo.service;
 
-import com.doquest.domain.ai.client.AiClient;
-import com.doquest.domain.ai.dto.AiParserDto;
+import com.doquest.domain.ai.service.AiRetryExecutor;
 import com.doquest.domain.memo.event.MemoAnalysisRequestedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +16,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class MemoAiEventListener {
 
-    private final AiClient aiClient;
+    private final AiRetryExecutor aiRetryExecutor;
     private final MemoAnalysisService memoAnalysisService;
 
     /**
@@ -35,14 +34,16 @@ public class MemoAiEventListener {
 
         try {
             // FastAPI AI 엔진 호출 (LangChain + LLM 추론)
-            AiParserDto.Response response = aiClient.parseMemo(event.memoId(), event.memberId(), event.content());
+            AiRetryExecutor.Result result = aiRetryExecutor.execute(
+                    event.memoId(), event.memberId(), event.content());
+            var response = result.response();
 
             log.info("[AI 파싱 성공] memoId={}, isSchedule={}, title='{}', links={}",
                     event.memoId(), response.isSchedule(), response.title(),
                     response.actionLinks() != null ? response.actionLinks().size() : 0);
 
             // 분석 결과와 메모 파싱 완료 상태를 독립 트랜잭션에 함께 반영
-            memoAnalysisService.completeAnalysis(event.memoId(), response);
+            memoAnalysisService.completeAnalysis(event.memoId(), response, result.attemptCount());
 
             // 후속 파이프라인 확장 포인트: 일정 감지 시 Schedule 도메인 연동
             // MemoAiEventListener.java 내부
@@ -52,10 +53,15 @@ public class MemoAiEventListener {
                 // TODO: scheduleService.createScheduleFromAi(event.memberId(), event.memoId(), response);
             }
 
-        } catch (Exception e) {
-            memoAnalysisService.failAnalysis(event.memoId());
+        } catch (AiRetryExecutor.RetryExhaustedException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            memoAnalysisService.failAnalysis(event.memoId(), e.getAttemptCount(), cause.getMessage());
             // 외부 AI 통신 장애/타임아웃이 분석 요청 응답에 전파되지 않도록 장애 격리 로깅
-            log.error("[AI 파이프라인 장애 격리] memoId={} 분석 실패 - Cause: {}", event.memoId(), e.getMessage(), e);
+            log.error("[AI 파이프라인 장애 격리] memoId={} attempts={} 분석 실패 - Cause: {}",
+                    event.memoId(), e.getAttemptCount(), cause.getMessage(), cause);
+        } catch (Exception e) {
+            memoAnalysisService.failAnalysis(event.memoId(), 1, e.getMessage());
+            log.error("[AI 응답 처리 실패] memoId={} 분석 실패 - Cause: {}", event.memoId(), e.getMessage(), e);
         }
     }
 }

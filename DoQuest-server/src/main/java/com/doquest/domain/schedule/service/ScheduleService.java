@@ -14,6 +14,7 @@ import com.doquest.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -36,6 +37,9 @@ public class ScheduleService {
 
         Memo memo = null;
         if (request.memoId() != null) {
+            if (scheduleRepository.existsByMemoId(request.memoId())) {
+                throw new BusinessException(ErrorCode.SCHEDULE_ALREADY_EXISTS_FOR_MEMO);
+            }
             memo = memoRepository.findByIdAndMemberId(request.memoId(), memberId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
         }
@@ -44,7 +48,14 @@ public class ScheduleService {
                 member, memo, request.title(), request.scheduledAt(), request.scheduledTime(), request.location(), request.summaryInfo()
         );
 
-        return ScheduleResponse.from(scheduleRepository.save(schedule));
+        try {
+            return ScheduleResponse.from(scheduleRepository.saveAndFlush(schedule));
+        } catch (DataIntegrityViolationException e) {
+            if (request.memoId() != null) {
+                throw new BusinessException(ErrorCode.SCHEDULE_ALREADY_EXISTS_FOR_MEMO);
+            }
+            throw e;
+        }
     }
 
     public List<ScheduleResponse> getMonthlySchedules(Long memberId, int year, int month) {

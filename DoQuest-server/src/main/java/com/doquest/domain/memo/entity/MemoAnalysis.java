@@ -52,21 +52,35 @@ public class MemoAnalysis extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT")
     private String summaryInfo;
 
+    @Column(nullable = false)
+    private int attemptCount;
+
+    @Column(length = 500)
+    private String lastError;
+
     public static MemoAnalysis pending(Memo memo) {
         MemoAnalysis analysis = new MemoAnalysis();
         analysis.memo = memo;
         analysis.status = MemoAnalysisStatus.PENDING;
+        analysis.attemptCount = 0;
         return analysis;
     }
 
     public void complete(boolean scheduleCandidate, String title, LocalDate scheduledAt, LocalTime scheduledTime,
                          String location, String summaryInfo) {
+        complete(scheduleCandidate, title, scheduledAt, scheduledTime, location, summaryInfo, 1);
+    }
+
+    public void complete(boolean scheduleCandidate, String title, LocalDate scheduledAt, LocalTime scheduledTime,
+                         String location, String summaryInfo, int attemptCount) {
         this.scheduleCandidate = scheduleCandidate;
         this.title = title;
         this.scheduledAt = scheduledAt;
         this.scheduledTime = scheduledTime;
         this.location = location;
         this.summaryInfo = summaryInfo;
+        this.attemptCount = attemptCount;
+        this.lastError = null;
         this.status = MemoAnalysisStatus.SUCCEEDED;
     }
 
@@ -76,7 +90,13 @@ public class MemoAnalysis extends BaseTimeEntity {
     }
 
     public void fail() {
+        fail(1, null);
+    }
+
+    public void fail(int attemptCount, String lastError) {
         this.status = MemoAnalysisStatus.FAILED;
+        this.attemptCount = attemptCount;
+        this.lastError = lastError;
     }
 
     public void restart() {
@@ -87,6 +107,8 @@ public class MemoAnalysis extends BaseTimeEntity {
         this.scheduledTime = null;
         this.location = null;
         this.summaryInfo = null;
+        this.attemptCount = 0;
+        this.lastError = null;
         this.memo.resetParsed();
     }
 

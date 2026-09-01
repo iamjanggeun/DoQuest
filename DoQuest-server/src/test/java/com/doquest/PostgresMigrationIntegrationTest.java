@@ -6,6 +6,7 @@ import com.doquest.domain.pet.entity.Pet;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -36,6 +37,9 @@ class PostgresMigrationIntegrationTest {
     @Autowired
     private MemberRepository memberRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @Test
     void flywaySchemaIsCompatibleWithJpaMappings() {
         Member saved = memberRepository.saveAndFlush(Member.createMember(
@@ -47,5 +51,22 @@ class PostgresMigrationIntegrationTest {
 
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.getCreatedAt()).isNotNull();
+
+        Integer retryColumns = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_name = 'memo_analyses'
+                  AND column_name IN ('attempt_count', 'last_error')
+                """, Integer.class);
+        Integer scheduleMemoUniqueConstraint = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.table_constraints
+                WHERE table_name = 'schedules'
+                  AND constraint_name = 'uk_schedules_memo'
+                  AND constraint_type = 'UNIQUE'
+                """, Integer.class);
+
+        assertThat(retryColumns).isEqualTo(2);
+        assertThat(scheduleMemoUniqueConstraint).isEqualTo(1);
     }
 }

@@ -41,7 +41,8 @@ public enum ErrorCode {
     // Schedule
     SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "존재하지 않는 일정입니다."),
     INVALID_SCHEDULE_DATE(HttpStatus.BAD_REQUEST, "S002", "유효하지 않은 일정 날짜 형식입니다."),
-    INVALID_SCHEDULE_TIME(HttpStatus.BAD_REQUEST, "S003", "유효하지 않은 일정 시간 형식입니다.");
+    INVALID_SCHEDULE_TIME(HttpStatus.BAD_REQUEST, "S003", "유효하지 않은 일정 시간 형식입니다."),
+    SCHEDULE_ALREADY_EXISTS_FOR_MEMO(HttpStatus.CONFLICT, "S004", "이 메모로 등록된 일정이 이미 존재합니다.");
 
     private final HttpStatus status;
     private final String code;

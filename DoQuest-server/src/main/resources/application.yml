@@ -15,6 +15,10 @@ spring:
           time_zone: UTC
 
 ai:
+  retry:
+    max-attempts: 3
+    initial-backoff-ms: 500
+    backoff-multiplier: 2.0
   service:
     base-url: http://localhost:8000
     connect-timeout-ms: 3000

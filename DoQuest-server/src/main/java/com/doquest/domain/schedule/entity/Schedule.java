@@ -36,8 +36,8 @@ public class Schedule extends BaseTimeEntity {
     private Member member;
 
     // 비정형 메모에서 파생된 경우 연결 (수동 생성 시 null 허용)
-    @ManyToOne(fetch = LAZY)
-    @JoinColumn(name = "memo_id", foreignKey = @ForeignKey(name = "fk_schedules_to_memos"))
+    @OneToOne(fetch = LAZY)
+    @JoinColumn(name = "memo_id", unique = true, foreignKey = @ForeignKey(name = "fk_schedules_to_memos"))
     private Memo memo;
 
     @Column(nullable = false, length = 100)

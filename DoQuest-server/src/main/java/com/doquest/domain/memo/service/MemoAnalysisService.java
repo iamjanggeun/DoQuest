@@ -51,17 +51,28 @@ public class MemoAnalysisService {
 
     @Transactional
     public void completeAnalysis(Long memoId, AiParserDto.Response response) {
+        completeAnalysis(memoId, response, 1);
+    }
+
+    @Transactional
+    public void completeAnalysis(Long memoId, AiParserDto.Response response, int attemptCount) {
         MemoAnalysis analysis = findAnalysis(memoId);
         LocalDate scheduledAt = parseScheduledAt(response.scheduledAt());
         LocalTime scheduledTime = parseScheduledTime(response.scheduledTime());
         analysis.complete(response.isSchedule(), response.title(), scheduledAt, scheduledTime,
-                response.location(), response.summaryInfo());
+                response.location(), response.summaryInfo(), attemptCount);
         analysis.getMemo().markAsParsed();
     }
 
     @Transactional
     public void failAnalysis(Long memoId) {
-        memoAnalysisRepository.findByMemoId(memoId).ifPresent(MemoAnalysis::fail);
+        failAnalysis(memoId, 1, null);
+    }
+
+    @Transactional
+    public void failAnalysis(Long memoId, int attemptCount, String lastError) {
+        memoAnalysisRepository.findByMemoId(memoId)
+                .ifPresent(analysis -> analysis.fail(attemptCount, sanitizeError(lastError)));
     }
 
     @Transactional
@@ -111,6 +122,14 @@ public class MemoAnalysisService {
         }
         analysis.restart();
         return analysis;
+    }
+
+    private String sanitizeError(String lastError) {
+        if (lastError == null || lastError.isBlank()) {
+            return null;
+        }
+        String singleLine = lastError.replaceAll("[\\r\\n]+", " ").trim();
+        return singleLine.length() <= 500 ? singleLine : singleLine.substring(0, 500);
     }
 
     private LocalDate parseScheduledAt(String value) {

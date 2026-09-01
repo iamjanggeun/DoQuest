@@ -81,6 +81,38 @@ class MemoAnalysisServiceTest {
         assertThat(analysis.getScheduledAt()).isEqualTo(LocalDate.of(2026, 8, 30));
         assertThat(analysis.getScheduledTime()).isEqualTo(LocalTime.of(14, 30));
         assertThat(analysis.getMemo().isParsed()).isTrue();
+        assertThat(analysis.getAttemptCount()).isEqualTo(1);
+        assertThat(analysis.getLastError()).isNull();
+    }
+
+    @Test
+    void failAnalysis_최종시도횟수와오류저장() {
+        MemoAnalysis analysis = createPendingAnalysis(1L, 10L);
+        given(memoAnalysisRepository.findByMemoId(10L)).willReturn(Optional.of(analysis));
+
+        memoAnalysisService.failAnalysis(10L, 3, "connection refused\nstack detail");
+
+        assertThat(analysis.getStatus()).isEqualTo(MemoAnalysisStatus.FAILED);
+        assertThat(analysis.getAttemptCount()).isEqualTo(3);
+        assertThat(analysis.getLastError()).isEqualTo("connection refused stack detail");
+    }
+
+    @Test
+    void requestAnalysis_FAILED분석은초기화후재시작() {
+        Long memberId = 1L;
+        Long memoId = 10L;
+        MemoAnalysis analysis = createPendingAnalysis(memberId, memoId);
+        analysis.fail(3, "connection refused");
+        Memo memo = analysis.getMemo();
+        given(memoRepository.findByIdAndMemberId(memoId, memberId)).willReturn(Optional.of(memo));
+        given(memoAnalysisRepository.findByMemoId(memoId)).willReturn(Optional.of(analysis));
+
+        var result = memoAnalysisService.requestAnalysis(memberId, memoId);
+
+        assertThat(result.status()).isEqualTo(MemoAnalysisStatus.PENDING);
+        assertThat(analysis.getAttemptCount()).isZero();
+        assertThat(analysis.getLastError()).isNull();
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(MemoAnalysisRequestedEvent.class));
     }
 
     @Test

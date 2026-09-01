@@ -13,6 +13,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
     Optional<Schedule> findByIdAndMemberId(Long scheduleId, Long memberId);
 
+    boolean existsByMemoId(Long memoId);
+
     // 특정 회원의 특정 기간(한 달 등) 일정 조회 (캘린더 렌더링용)
     List<Schedule> findByMemberIdAndScheduledAtBetweenOrderByScheduledAtAsc(
             Long memberId, LocalDate startDate, LocalDate endDate
