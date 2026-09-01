@@ -26,7 +26,7 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 | 중복 확정 방지 | 상태 검증·낙관적 잠금과 `schedules.memo_id` 유니크 제약으로 동일 Memo의 Schedule 중복 생성 방어 |
 | 일정 조회 최적화 | `(member_id, scheduled_at)` 복합 인덱스로 월별 조회와 D-3 미완료 일정 조회 지원 |
 | 날짜·시간 계약 | `scheduled_at(YYYY-MM-DD)`과 선택형 `scheduled_time(HH:mm)`을 분리해 FastAPI-Spring-React End-to-End 연동 |
-| 테스트 | Spring 전체 `64 tests`, 실패 `0`, 오류 `0` |
+| 테스트 | Spring 전체 `65 tests`, 실패 `0`, 오류 `0` |
 
 성능 수치는 동일한 로컬 환경에서 실제 OpenAI E2E를 동기·비동기 각각 10회 측정한 상대 비교 결과입니다. LLM 추론 자체가 빨라진 것이 아니라 외부 I/O를 사용자 응답 경로에서 분리한 효과입니다.
 
@@ -163,7 +163,8 @@ schedules.memo_id UNIQUE 제약
 - 사용자 재요청: `FAILED → PENDING`, 기존 실패 정보 초기화
 - 동일 Memo의 Schedule 중복 요청: 애플리케이션 검사와 DB 유니크 제약으로 차단
 - Flyway V2의 컬럼·유니크 제약을 PostgreSQL Testcontainers에서 검증
-- 전체 Spring 테스트 `64 tests`, 실패 `0`, 오류 `0`
+- 실제 PostgreSQL row에서 `FAILED / attempt_count=3 / last_error` 저장과 재시작 후 `PENDING / 0 / NULL` 초기화 검증
+- 전체 Spring 테스트 `65 tests`, 실패 `0`, 오류 `0`
 - React/Vite 프로덕션 빌드 성공
 - FastAPI 회귀 테스트 `4 passed`
 
@@ -308,7 +309,7 @@ cd DoQuest-server
 현재 검증 결과:
 
 ```text
-64 tests completed
+65 tests completed
 0 failures
 0 errors
 ```
