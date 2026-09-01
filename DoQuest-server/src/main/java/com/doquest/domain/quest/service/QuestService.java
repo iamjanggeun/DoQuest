@@ -39,7 +39,7 @@ public class QuestService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
-        // TODO: Phase 4에서 LangChain / Vector DB 연동하여 '시맨틱 중복 퀘스트' 검증 로직이 들어갈 자리
+        // 제출 이후 확장 범위: Vector DB 기반 시맨틱 중복 퀘스트 검증
 
         Quest quest = Quest.createQuest(member, title, category, DEFAULT_REWARD_EXP, Instant.now(clock));
         Quest savedQuest = questRepository.save(quest);

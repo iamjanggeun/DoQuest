@@ -45,12 +45,10 @@ public class MemoAiEventListener {
             // 분석 결과와 메모 파싱 완료 상태를 독립 트랜잭션에 함께 반영
             memoAnalysisService.completeAnalysis(event.memoId(), response, result.attemptCount());
 
-            // 후속 파이프라인 확장 포인트: 일정 감지 시 Schedule 도메인 연동
-            // MemoAiEventListener.java 내부
+            // 일정 후보는 자동 등록하지 않고 Two-Phase UX에서 사용자 확정을 기다린다.
             if (response.isSchedule()) {
-                log.info("[일정 자동 등록 대상 감지] memoId={}, scheduledAt={}, location={}",
+                log.info("[일정 후보 감지] memoId={}, scheduledAt={}, location={}",
                         event.memoId(), response.scheduledAt(), response.location());
-                // TODO: scheduleService.createScheduleFromAi(event.memberId(), event.memoId(), response);
             }
 
         } catch (AiRetryExecutor.RetryExhaustedException e) {
