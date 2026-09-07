@@ -16,7 +16,7 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 ## 핵심 성과
 
 | 주제 | 구현 및 검증 결과 |
-|---|---|
+| --- | --- |
 | 응답 지연 격리 | 평균 HTTP 응답 시간 `1,761.55ms → 9.46ms`, 약 `99.46%` 감소 |
 | 트랜잭션 경계 | `AFTER_COMMIT` 이후에만 AI 작업을 실행해 롤백된 Memo의 AI 호출 방지 |
 | 장애 격리 | FastAPI 종료 상태에서도 Memo 생성 `201 Created`, row 유지, `isParsed=false` 확인 |
@@ -34,34 +34,45 @@ DoQuest는 사용자가 작성한 비정형 메모에서 일정 정보를 추출
 
 PostgreSQL 환경의 마이그레이션, `AFTER_COMMIT` 커밋·롤백, FastAPI 연결 장애와 복구 실험은 [PostgreSQL AFTER_COMMIT 및 장애 격리 검증](docs/postgresql-after-commit-failure-e2e.md)에 기록했습니다.
 
-### Two-Phase HTTP E2E 결과
+## 기술 스택
 
-2026-08-28 로컬 H2 환경에서 Spring Boot, FastAPI, OpenAI를 실제로 연결해 다음 흐름을 검증했습니다.
+| 영역 | 기술 |
+| --- | --- |
+| Backend | Java 17, Spring Boot 3.5.16, Spring MVC |
+| Persistence | Spring Data JPA, Hibernate, Flyway |
+| Security | Spring Security 6, JJWT, Stateless JWT |
+| Async / Integration | Spring Event, `@Async`, RestClient |
+| Local Database | H2 In-Memory, PostgreSQL compatibility mode |
+| Production Database | PostgreSQL 16 |
+| AI Service | FastAPI, LangChain LCEL, OpenAI Structured Output |
+| Frontend MVP | React, TypeScript, Vite, Lucide |
+| Testing | JUnit 5, AssertJ, Mockito, MockMvc, MockRestServiceServer, Testcontainers |
 
-```text
-Memo 생성(201)
-→ 사용자 AI 일정 찾기 요청(202)
-→ MemoAnalysis(PENDING)
-→ AI 분석 완료(SUCCEEDED)
-→ 사용자 확정(201)
-→ MemoAnalysis(CONFIRMED)
-→ 월간 Schedule 조회 반영
-```
+로컬의 빠른 개발은 H2로 유지하고, 운영 스키마는 PostgreSQL과 Flyway로 관리합니다. PostgreSQL Testcontainers에서 마이그레이션, JPA 매핑, `AFTER_COMMIT` 트랜잭션 경계를 검증합니다.
 
-| 검증 항목 | 실제 결과 |
-|---|---|
-| FastAPI 상태 | `200 OK` |
-| Memo 생성 | `201 Created`, memoId `1` |
-| 분석 상태 전이 | `PENDING → PENDING → SUCCEEDED` |
-| AI 추출 결과 | `2026-08-30`, 장소 `선릉` |
-| Memo 파싱 상태 | `isParsed=true` |
-| 사용자 확정 | `201 Created`, scheduleId `1` |
-| 최종 분석 상태 | `CONFIRMED` |
-| 월간 캘린더 조회 | 동일 memoId의 Schedule 1건 |
-| 중복 확정 | `409 Conflict / MA003` |
-| 확정 Memo 삭제 | `409 Conflict / MA004` |
+## 주요 도메인
 
-자동 테스트뿐 아니라 실제 HTTP 요청에서도 AI 제안이 사용자 확인 전에는 Schedule로 저장되지 않고, 확정 이후 정확히 한 번만 등록되는 것을 확인했습니다. 상세 요청·응답과 추가 장애 시나리오는 [Two-Phase E2E 테스트 결과](docs/two-phase-e2e-test-results.md)에 기록했습니다.
+### Memo / MemoAnalysis / Schedule
+
+- Memo 원문과 AI 분석 결과, 확정된 Schedule을 분리해 각 도메인의 책임을 명확히 유지
+- AI 응답 계약: `is_schedule`, `title`, `scheduled_at`, `scheduled_time`, `location`, `summary_info`, `action_links`
+- KST 기준 Temporal Grounding은 FastAPI에서 처리하고 Spring은 날짜를 `LocalDate`, 선택 시간을 `LocalTime`으로 검증·변환
+- `scheduled_time`은 24시간제 `HH:mm` 또는 `null`이며, 시간이 언급되지 않은 마감 일정에는 임의 시간을 생성하지 않음
+- 수동 일정과 Memo 기반 일정 생성 지원
+- Memo 기반 일정은 애플리케이션 선검사와 DB 유니크 제약을 함께 적용해 동시 요청에서도 한 건만 생성
+- 월별 일정 및 D-3 미완료 일정 조회 지원
+
+### Quest / Pet
+
+- 퀘스트 보상 경험치를 클라이언트 입력에서 제외하고 서버 정책으로 관리
+- `QuestStatus`를 상태의 단일 진실 공급원으로 사용
+- 생성 직후 반복 완료로 경험치를 획득하지 못하도록 최소 30분 수행 시간 검증
+- Member가 Pet의 생명주기를 관리하는 단방향 1:1 매핑으로 순환 의존 제거
+
+### Dashboard
+
+- Pet 상태와 진행 중 Quest를 하나의 `DashboardResponse`로 묶는 BFF/Aggregator API 제공
+- 화면 진입 시 여러 API를 호출하는 대신 한 번의 요청으로 필요한 데이터 반환
 
 ## 아키텍처
 
@@ -109,65 +120,6 @@ MemoAnalysis(SUCCEEDED/FAILED) + Memo.isParsed 갱신
 - 일시적 네트워크·5xx·429 장애는 최대 3회 지수 백오프로 재시도하고, 최종 실패 시 시도 횟수와 정제된 오류를 `MemoAnalysis`에 저장
 - `FAILED` 분석은 같은 API로 다시 요청하면 기존 결과를 초기화하고 재실행하며, outbox/DLQ는 제출 범위에서 제외
 
-### 실패 복구 최소 구현: 설계 과정과 판단
-
-이 단계를 시작할 때 이미 `FAILED → PENDING` 사용자 재요청, `PENDING` 중복 요청 차단, `CONFIRMED` 재확정 차단, `@Version` 낙관적 잠금과 AI 장애 격리는 구현돼 있었습니다. 남은 문제는 짧은 일시 장애도 즉시 최종 실패로 끝나는 점, 실패 원인을 진단할 정보가 없는 점, 거의 동시에 들어온 확정 요청이 애플리케이션 검사 구간을 함께 통과할 수 있는 점이었습니다.
-
-#### 1. 일시 장애만 제한적으로 자동 재시도
-
-범용 재시도 프레임워크를 추가하는 대신 예외 분류와 시도 횟수를 단위 테스트로 고정하기 쉬운 `AiRetryExecutor`를 분리했습니다.
-
-```text
-1차 호출 실패
-→ 500ms 대기
-→ 2차 호출 실패
-→ 1,000ms 대기
-→ 3차 호출
-→ 성공: SUCCEEDED
-→ 최종 실패: FAILED
-```
-
-| 재시도 | 즉시 실패 처리 |
-|---|---|
-| 연결 거부·연결/읽기 타임아웃 | 잘못된 요청·인증 등 일반 4xx |
-| FastAPI 5xx | FastAPI 응답 계약 위반 |
-| 429 Too Many Requests | 날짜·시간 파싱 오류와 Spring 내부 예외 |
-
-재시도 가능한 장애만 최대 3회 지수 백오프로 흡수합니다. 영구 오류까지 반복 호출하면 복구 가능성 없이 응답 지연과 외부 API 부하만 늘어나므로 4xx와 응답 처리 오류는 첫 실패에서 종료합니다.
-
-#### 2. 운영 진단에 필요한 실패 정보만 저장
-
-`memo_analyses`에 `attempt_count`와 최대 500자의 `last_error`를 Flyway V2로 추가했습니다. 오류 문자열은 줄바꿈을 제거하고 길이를 제한해 저장하며, 사용자가 다시 분석을 요청하면 이전 시도 횟수와 오류를 초기화합니다. 내부 진단 정보는 API에 노출하지 않아 프론트에는 기존의 안전한 일반 오류 문구만 표시합니다.
-
-초기 계획에서 검토한 별도 `failed_at` 컬럼은 이번 최소 구현에는 포함하지 않았습니다. 제출 범위에서는 자동 복구 여부, 총 시도 횟수와 최종 원인을 확인하는 데 집중했습니다.
-
-#### 3. 애플리케이션 검사와 DB 제약으로 중복 생성 차단
-
-```text
-서비스의 기존 Schedule 검사
-        ↓
-MemoAnalysis @Version 충돌 검사
-        ↓
-schedules.memo_id UNIQUE 제약
-```
-
-서비스 검사는 빠르고 이해하기 쉬운 오류를 제공하지만 동시 요청 사이의 경쟁 조건을 단독으로 막을 수 없습니다. MVP의 “한 Memo당 최대 한 Schedule” 정책을 PostgreSQL 유니크 제약으로도 고정하고, 충돌한 요청의 DB 예외를 `409 Conflict / S004`로 변환했습니다. PostgreSQL은 유니크 컬럼의 `NULL`을 여러 건 허용하므로 Memo가 없는 수동 일정 생성에는 영향을 주지 않습니다.
-
-이 구조는 모든 실패를 자동 처리하는 outbox/DLQ 대신, 현재 프로젝트 규모에서 발생 가능성이 높은 일시 장애와 중복 생성만 작은 변경으로 방어한 선택입니다. 장기 장애의 지속 재처리와 운영 관측성은 제출 이후 확장 범위로 남겼습니다.
-
-#### 검증 결과
-
-- 첫 5xx 뒤 두 번째 호출 성공: 호출 2회, `SUCCEEDED`, `attempt_count=2`
-- 네트워크 오류 3회: `FAILED`, `attempt_count=3`, 최종 오류 저장
-- 재시도하지 않는 4xx: 호출 1회 후 `FAILED`
-- 사용자 재요청: `FAILED → PENDING`, 기존 실패 정보 초기화
-- 동일 Memo의 Schedule 중복 요청: 애플리케이션 검사와 DB 유니크 제약으로 차단
-- Flyway V2의 컬럼·유니크 제약을 PostgreSQL Testcontainers에서 검증
-- 실제 PostgreSQL row에서 `FAILED / attempt_count=3 / last_error` 저장과 재시작 후 `PENDING / 0 / NULL` 초기화 검증
-- 전체 Spring 테스트 `65 tests`, 실패 `0`, 오류 `0`
-- React/Vite 프로덕션 빌드 성공
-- FastAPI 회귀 테스트 `4 passed`
-
 ### Two-Phase 일정 등록
 
 ```mermaid
@@ -195,152 +147,83 @@ POST /api/v1/memos/{memoId}/analysis/confirm
 - 이미 `CONFIRMED`된 결과가 아닌가
 - 동시에 확정 요청이 들어와도 한 건만 생성되는가
 
-## 주요 도메인
+## 메모 저장과 일정 등록 UX 결정
 
-### Memo / MemoAnalysis / Schedule
+MVP에서는 “입력을 멈추면 모든 메모를 자동 분석·자동 등록”하는 방식과 “사용자가 버튼으로 AI 분석을 요청하고 확정”하는 방식을 비교했습니다.
 
-- Memo 원문과 AI 분석 결과, 확정된 Schedule을 분리해 각 도메인의 책임을 명확히 유지
-- AI 응답 계약: `is_schedule`, `title`, `scheduled_at`, `scheduled_time`, `location`, `summary_info`, `action_links`
-- KST 기준 Temporal Grounding은 FastAPI에서 처리하고 Spring은 날짜를 `LocalDate`, 선택 시간을 `LocalTime`으로 검증·변환
-- `scheduled_time`은 24시간제 `HH:mm` 또는 `null`이며, 시간이 언급되지 않은 마감 일정에는 임의 시간을 생성하지 않음
-- 수동 일정과 Memo 기반 일정 생성 지원
-- Memo 기반 일정은 애플리케이션 선검사와 DB 유니크 제약을 함께 적용해 동시 요청에서도 한 건만 생성
-- 월별 일정 및 D-3 미완료 일정 조회 지원
+자동 등록 방식은 입력 흐름이 빠르지만 모든 메모에 LLM 비용이 발생하고, 오탐 일정이 캘린더에 쌓이며, 메모 삭제 시 Schedule 연쇄 삭제 정책까지 즉시 결정해야 합니다. 반면 명시적 분석 방식은 한 번의 사용자 동작이 추가되지만 분석 의도가 분명하고 AI 제안을 등록 전에 검토할 수 있습니다.
 
-### Quest / Pet
-
-- 퀘스트 보상 경험치를 클라이언트 입력에서 제외하고 서버 정책으로 관리
-- `QuestStatus`를 상태의 단일 진실 공급원으로 사용
-- 생성 직후 반복 완료로 경험치를 획득하지 못하도록 최소 30분 수행 시간 검증
-- Member가 Pet의 생명주기를 관리하는 단방향 1:1 매핑으로 순환 의존 제거
-
-### Dashboard
-
-- Pet 상태와 진행 중 Quest를 하나의 `DashboardResponse`로 묶는 BFF/Aggregator API 제공
-- 화면 진입 시 여러 API를 호출하는 대신 한 번의 요청으로 필요한 데이터 반환
-
-## 기술 스택
-
-| 영역 | 기술 |
-|---|---|
-| Backend | Java 17, Spring Boot 3.5.16, Spring MVC |
-| Persistence | Spring Data JPA, Hibernate, Flyway |
-| Security | Spring Security 6, JJWT, Stateless JWT |
-| Async / Integration | Spring Event, `@Async`, RestClient |
-| Local Database | H2 In-Memory, PostgreSQL compatibility mode |
-| Production Database | PostgreSQL 16 |
-| AI Service | FastAPI, LangChain LCEL, OpenAI Structured Output |
-| Frontend MVP | React, TypeScript, Vite, Lucide |
-| Testing | JUnit 5, AssertJ, Mockito, MockMvc, MockRestServiceServer, Testcontainers |
-
-로컬의 빠른 개발은 H2로 유지하고, 운영 스키마는 PostgreSQL과 Flyway로 관리합니다. PostgreSQL Testcontainers에서 마이그레이션, JPA 매핑, `AFTER_COMMIT` 트랜잭션 경계를 검증합니다.
-
-## Frontend MVP
-
-`DoQuest-web`은 백엔드 API 계약과 Two-Phase 흐름을 실제 화면에서 검증하기 위한 React 기반 MVP입니다.
-
-- 회원가입 및 JWT 로그인
-- 월별 캘린더와 날짜별 일정 조회
-- 일정 생성·수정·완료·삭제
-- 수동 입력 시간과 AI가 추출한 시간을 캘린더 셀·날짜별 상세·분석 제안에 표시
-- 메모장 단독 화면과 입력 중단 후 자동 저장
-- 연속 입력·메모 전환 시 단일 저장 요청만 실행하고 저장 중 전환을 제한해 생성/수정 순서 보장
-- 사용자 요청으로 AI 분석 시작 및 상태 자동 폴링
-- AI 일정 제안 확인 후 Schedule 확정 및 캘린더 데이터 즉시 재조회
-- 데스크톱·모바일 반응형 레이아웃
-
-로컬 개발 서버는 `/api` 요청을 Spring Boot의 `localhost:8080`으로 프록시하므로 별도의 CORS 설정 없이 연동할 수 있습니다.
-
-```bash
-cd DoQuest-server
-./gradlew bootRun
-
-# 별도 터미널
-cd DoQuest-web
-npm install
-npm run dev
-```
-
-브라우저에서 `http://localhost:5173`으로 접속합니다. AI 분석까지 확인하려면 FastAPI 서비스도 `localhost:8000`에서 실행해야 합니다.
-
-## API 요약
-
-모든 인증 필요 API는 `Authorization: Bearer <access-token>` 헤더를 사용합니다.
-
-| 도메인 | Method | Endpoint | 설명 |
-|---|---|---|---|
-| Auth | POST | [`/api/v1/auth/signup`](docs/api-reference.md#auth-signup) | 회원가입 |
-| Auth | POST | [`/api/v1/auth/login`](docs/api-reference.md#auth-login) | 로그인 및 JWT 발급 |
-| Dashboard | GET | [`/api/v1/dashboard`](docs/api-reference.md#dashboard-get) | Pet + 진행 중 Quest 통합 조회 |
-| Memo | POST | [`/api/v1/memos`](docs/api-reference.md#memo-create) | Memo 생성 |
-| Memo | GET | [`/api/v1/memos`](docs/api-reference.md#memo-list) | 회원의 Memo 목록 조회 |
-| Memo | PATCH | [`/api/v1/memos/{memoId}`](docs/api-reference.md#memo-update) | Memo 수정 |
-| Memo | DELETE | [`/api/v1/memos/{memoId}`](docs/api-reference.md#memo-delete) | Memo 삭제 |
-| Analysis | POST | [`/api/v1/memos/{memoId}/analysis`](docs/api-reference.md#analysis-request) | 사용자 요청으로 비동기 AI 분석 시작 |
-| Analysis | GET | [`/api/v1/memos/{memoId}/analysis`](docs/api-reference.md#analysis-get) | AI 분석 상태와 결과 조회 |
-| Analysis | POST | [`/api/v1/memos/{memoId}/analysis/confirm`](docs/api-reference.md#analysis-confirm) | 분석 결과를 Schedule로 확정 |
-| Quest | POST | [`/api/v1/quests`](docs/api-reference.md#quest-create) | Quest 생성 |
-| Schedule | POST | [`/api/v1/schedules`](docs/api-reference.md#schedule-create) | 수동/컨펌 Schedule 생성 |
-| Schedule | GET | [`/api/v1/schedules?year=2026&month=8`](docs/api-reference.md#schedule-monthly) | 회원의 월별 Schedule 조회 |
-| Schedule | GET | [`/api/v1/schedules/curations`](docs/api-reference.md#schedule-curations) | D-3 미완료 Schedule 조회 |
-| Schedule | GET | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-get) | Schedule 단건 조회 |
-| Schedule | PATCH | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-update) | Schedule 제목·날짜·시간·장소·메모 수정 |
-| Schedule | PATCH | [`/api/v1/schedules/{scheduleId}/completion`](docs/api-reference.md#schedule-completion) | Schedule 완료 상태 변경 |
-| Schedule | DELETE | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-delete) | Schedule 삭제 |
-
-전체 요청·응답 JSON과 오류 코드는 [API JSON Reference](docs/api-reference.md)에서 확인할 수 있습니다.
-
-## 테스트 전략
-
-| 계층 | 검증 대상 |
-|---|---|
-| Domain Unit | 팩토리 메서드, 상태 전이, 30분 수행 가드레일 |
-| Service Unit | 회원 소유권, 분석 상태 전이, 중복 확정, DTO 변환 |
-| MVC Slice | 요청 검증, 상태 코드, JSON 응답 계약 |
-| RestClient Slice | 실제 FastAPI 연결 없이 요청·응답 DTO 계약 검증 |
-| Transaction Integration | commit/rollback에 따른 `AFTER_COMMIT` 실행 여부 검증 |
-| Failure E2E | FastAPI 프로세스 종료 시 Memo 보존과 장애 범위 확인 |
-
-```bash
-cd DoQuest-server
-./gradlew test
-```
-
-현재 검증 결과:
+따라서 현재는 다음 경계를 채택했습니다.
 
 ```text
-65 tests completed
-0 failures
-0 errors
+메모 입력 중단 → Memo 자동 저장
+사용자 ‘AI로 일정 찾기’ → 비동기 분석
+AI 후보 자동 표시 → 사용자 확정 → Schedule 생성
 ```
 
-## 실행 방법
+- 메모 저장은 빠르고 예측 가능한 기본 기능으로 유지
+- LLM 호출 시점을 사용자가 통제해 불필요한 호출과 비용 방지
+- AI 오탐을 `MemoAnalysis` 제안 단계에서 차단
+- 한 메모의 복수 일정 추출은 MVP 이후 후보 배열과 부분 확정 모델로 확장
 
-### 1. 요구사항
+## 실패 복구 최소 구현: 설계 과정과 판단
 
-- Java 17
-- FastAPI AI 서버: `http://localhost:8000`
+이 단계를 시작할 때 이미 `FAILED → PENDING` 사용자 재요청, `PENDING` 중복 요청 차단, `CONFIRMED` 재확정 차단, `@Version` 낙관적 잠금과 AI 장애 격리는 구현돼 있었습니다. 남은 문제는 짧은 일시 장애도 즉시 최종 실패로 끝나는 점, 실패 원인을 진단할 정보가 없는 점, 거의 동시에 들어온 확정 요청이 애플리케이션 검사 구간을 함께 통과할 수 있는 점이었습니다.
 
-### 2. 로컬 설정
+### 1. 일시 장애만 제한적으로 자동 재시도
 
-JWT 비밀키는 저장소에 커밋하지 않고 환경별 비밀 설정으로 관리합니다. 다음 값이 필요합니다.
+범용 재시도 프레임워크를 추가하는 대신 예외 분류와 시도 횟수를 단위 테스트로 고정하기 쉬운 `AiRetryExecutor`를 분리했습니다.
 
-```yaml
-jwt:
-  secret: replace-with-at-least-32-byte-secret
-  access-token-expiration: 3600000
+```text
+1차 호출 실패
+→ 500ms 대기
+→ 2차 호출 실패
+→ 1,000ms 대기
+→ 3차 호출
+→ 성공: SUCCEEDED
+→ 최종 실패: FAILED
 ```
 
-AI 서버 주소와 제한 시간은 `application.yml`의 `ai.service`에서 설정합니다.
+| 재시도 | 즉시 실패 처리 |
+| --- | --- |
+| 연결 거부·연결/읽기 타임아웃 | 잘못된 요청·인증 등 일반 4xx |
+| FastAPI 5xx | FastAPI 응답 계약 위반 |
+| 429 Too Many Requests | 날짜·시간 파싱 오류와 Spring 내부 예외 |
 
-### 3. Spring 실행
+재시도 가능한 장애만 최대 3회 지수 백오프로 흡수합니다. 영구 오류까지 반복 호출하면 복구 가능성 없이 응답 지연과 외부 API 부하만 늘어나므로 4xx와 응답 처리 오류는 첫 실패에서 종료합니다.
 
-```bash
-cd DoQuest-server
-./gradlew bootRun
+### 2. 운영 진단에 필요한 실패 정보만 저장
+
+`memo_analyses`에 `attempt_count`와 최대 500자의 `last_error`를 Flyway V2로 추가했습니다. 오류 문자열은 줄바꿈을 제거하고 길이를 제한해 저장하며, 사용자가 다시 분석을 요청하면 이전 시도 횟수와 오류를 초기화합니다. 내부 진단 정보는 API에 노출하지 않아 프론트에는 기존의 안전한 일반 오류 문구만 표시합니다.
+
+초기 계획에서 검토한 별도 `failed_at` 컬럼은 이번 최소 구현에는 포함하지 않았습니다. 제출 범위에서는 자동 복구 여부, 총 시도 횟수와 최종 원인을 확인하는 데 집중했습니다.
+
+### 3. 애플리케이션 검사와 DB 제약으로 중복 생성 차단
+
+```text
+서비스의 기존 Schedule 검사
+        ↓
+MemoAnalysis @Version 충돌 검사
+        ↓
+schedules.memo_id UNIQUE 제약
 ```
 
-로컬 프로필은 H2 In-Memory DB를 사용합니다.
+서비스 검사는 빠르고 이해하기 쉬운 오류를 제공하지만 동시 요청 사이의 경쟁 조건을 단독으로 막을 수 없습니다. MVP의 “한 Memo당 최대 한 Schedule” 정책을 PostgreSQL 유니크 제약으로도 고정하고, 충돌한 요청의 DB 예외를 `409 Conflict / S004`로 변환했습니다. PostgreSQL은 유니크 컬럼의 `NULL`을 여러 건 허용하므로 Memo가 없는 수동 일정 생성에는 영향을 주지 않습니다.
+
+이 구조는 모든 실패를 자동 처리하는 outbox/DLQ 대신, 현재 프로젝트 규모에서 발생 가능성이 높은 일시 장애와 중복 생성만 작은 변경으로 방어한 선택입니다. 장기 장애의 지속 재처리와 운영 관측성은 제출 이후 확장 범위로 남겼습니다.
+
+### 검증 결과
+
+- 첫 5xx 뒤 두 번째 호출 성공: 호출 2회, `SUCCEEDED`, `attempt_count=2`
+- 네트워크 오류 3회: `FAILED`, `attempt_count=3`, 최종 오류 저장
+- 재시도하지 않는 4xx: 호출 1회 후 `FAILED`
+- 사용자 재요청: `FAILED → PENDING`, 기존 실패 정보 초기화
+- 동일 Memo의 Schedule 중복 요청: 애플리케이션 검사와 DB 유니크 제약으로 차단
+- Flyway V2의 컬럼·유니크 제약을 PostgreSQL Testcontainers에서 검증
+- 실제 PostgreSQL row에서 `FAILED / attempt_count=3 / last_error` 저장과 재시작 후 `PENDING / 0 / NULL` 초기화 검증
+- 전체 Spring 테스트 `65 tests`, 실패 `0`, 오류 `0`
+- React/Vite 프로덕션 빌드 성공
+- FastAPI 회귀 테스트 `4 passed`
 
 ## 트러블슈팅 하이라이트
 
@@ -404,24 +287,141 @@ cd DoQuest-server
 
 </details>
 
-## 메모 저장과 일정 등록 UX 결정
+## 테스트 전략
 
-MVP에서는 “입력을 멈추면 모든 메모를 자동 분석·자동 등록”하는 방식과 “사용자가 버튼으로 AI 분석을 요청하고 확정”하는 방식을 비교했습니다.
+| 계층 | 검증 대상 |
+| --- | --- |
+| Domain Unit | 팩토리 메서드, 상태 전이, 30분 수행 가드레일 |
+| Service Unit | 회원 소유권, 분석 상태 전이, 중복 확정, DTO 변환 |
+| MVC Slice | 요청 검증, 상태 코드, JSON 응답 계약 |
+| RestClient Slice | 실제 FastAPI 연결 없이 요청·응답 DTO 계약 검증 |
+| Transaction Integration | commit/rollback에 따른 `AFTER_COMMIT` 실행 여부 검증 |
+| Failure E2E | FastAPI 프로세스 종료 시 Memo 보존과 장애 범위 확인 |
 
-자동 등록 방식은 입력 흐름이 빠르지만 모든 메모에 LLM 비용이 발생하고, 오탐 일정이 캘린더에 쌓이며, 메모 삭제 시 Schedule 연쇄 삭제 정책까지 즉시 결정해야 합니다. 반면 명시적 분석 방식은 한 번의 사용자 동작이 추가되지만 분석 의도가 분명하고 AI 제안을 등록 전에 검토할 수 있습니다.
-
-따라서 현재는 다음 경계를 채택했습니다.
-
-```text
-메모 입력 중단 → Memo 자동 저장
-사용자 ‘AI로 일정 찾기’ → 비동기 분석
-AI 후보 자동 표시 → 사용자 확정 → Schedule 생성
+```bash
+cd DoQuest-server
+./gradlew test
 ```
 
-- 메모 저장은 빠르고 예측 가능한 기본 기능으로 유지
-- LLM 호출 시점을 사용자가 통제해 불필요한 호출과 비용 방지
-- AI 오탐을 `MemoAnalysis` 제안 단계에서 차단
-- 한 메모의 복수 일정 추출은 MVP 이후 후보 배열과 부분 확정 모델로 확장
+현재 검증 결과:
+
+```text
+65 tests completed
+0 failures
+0 errors
+```
+
+### Two-Phase HTTP E2E 결과
+
+2026-08-28 로컬 H2 환경에서 Spring Boot, FastAPI, OpenAI를 실제로 연결해 다음 흐름을 검증했습니다.
+
+```text
+Memo 생성(201)
+→ 사용자 AI 일정 찾기 요청(202)
+→ MemoAnalysis(PENDING)
+→ AI 분석 완료(SUCCEEDED)
+→ 사용자 확정(201)
+→ MemoAnalysis(CONFIRMED)
+→ 월간 Schedule 조회 반영
+```
+
+| 검증 항목 | 실제 결과 |
+| --- | --- |
+| FastAPI 상태 | `200 OK` |
+| Memo 생성 | `201 Created`, memoId `1` |
+| 분석 상태 전이 | `PENDING → PENDING → SUCCEEDED` |
+| AI 추출 결과 | `2026-08-30`, 장소 `선릉` |
+| Memo 파싱 상태 | `isParsed=true` |
+| 사용자 확정 | `201 Created`, scheduleId `1` |
+| 최종 분석 상태 | `CONFIRMED` |
+| 월간 캘린더 조회 | 동일 memoId의 Schedule 1건 |
+| 중복 확정 | `409 Conflict / MA003` |
+| 확정 Memo 삭제 | `409 Conflict / MA004` |
+
+자동 테스트뿐 아니라 실제 HTTP 요청에서도 AI 제안이 사용자 확인 전에는 Schedule로 저장되지 않고, 확정 이후 정확히 한 번만 등록되는 것을 확인했습니다. 상세 요청·응답과 추가 장애 시나리오는 [Two-Phase E2E 테스트 결과](docs/two-phase-e2e-test-results.md)에 기록했습니다.
+
+## Frontend MVP
+
+`DoQuest-web`은 백엔드 API 계약과 Two-Phase 흐름을 실제 화면에서 검증하기 위한 React 기반 MVP입니다.
+
+- 회원가입 및 JWT 로그인
+- 월별 캘린더와 날짜별 일정 조회
+- 일정 생성·수정·완료·삭제
+- 수동 입력 시간과 AI가 추출한 시간을 캘린더 셀·날짜별 상세·분석 제안에 표시
+- 메모장 단독 화면과 입력 중단 후 자동 저장
+- 연속 입력·메모 전환 시 단일 저장 요청만 실행하고 저장 중 전환을 제한해 생성/수정 순서 보장
+- 사용자 요청으로 AI 분석 시작 및 상태 자동 폴링
+- AI 일정 제안 확인 후 Schedule 확정 및 캘린더 데이터 즉시 재조회
+- 데스크톱·모바일 반응형 레이아웃
+
+로컬 개발 서버는 `/api` 요청을 Spring Boot의 `localhost:8080`으로 프록시하므로 별도의 CORS 설정 없이 연동할 수 있습니다.
+
+```bash
+cd DoQuest-server
+./gradlew bootRun
+
+# 별도 터미널
+cd DoQuest-web
+npm install
+npm run dev
+```
+
+브라우저에서 `http://localhost:5173`으로 접속합니다. AI 분석까지 확인하려면 FastAPI 서비스도 `localhost:8000`에서 실행해야 합니다.
+
+## API 요약
+
+모든 인증 필요 API는 `Authorization: Bearer <access-token>` 헤더를 사용합니다.
+
+| 도메인 | Method | Endpoint | 설명 |
+| --- | --- | --- | --- |
+| Auth | POST | [`/api/v1/auth/signup`](docs/api-reference.md#auth-signup) | 회원가입 |
+| Auth | POST | [`/api/v1/auth/login`](docs/api-reference.md#auth-login) | 로그인 및 JWT 발급 |
+| Dashboard | GET | [`/api/v1/dashboard`](docs/api-reference.md#dashboard-get) | Pet + 진행 중 Quest 통합 조회 |
+| Memo | POST | [`/api/v1/memos`](docs/api-reference.md#memo-create) | Memo 생성 |
+| Memo | GET | [`/api/v1/memos`](docs/api-reference.md#memo-list) | 회원의 Memo 목록 조회 |
+| Memo | PATCH | [`/api/v1/memos/{memoId}`](docs/api-reference.md#memo-update) | Memo 수정 |
+| Memo | DELETE | [`/api/v1/memos/{memoId}`](docs/api-reference.md#memo-delete) | Memo 삭제 |
+| Analysis | POST | [`/api/v1/memos/{memoId}/analysis`](docs/api-reference.md#analysis-request) | 사용자 요청으로 비동기 AI 분석 시작 |
+| Analysis | GET | [`/api/v1/memos/{memoId}/analysis`](docs/api-reference.md#analysis-get) | AI 분석 상태와 결과 조회 |
+| Analysis | POST | [`/api/v1/memos/{memoId}/analysis/confirm`](docs/api-reference.md#analysis-confirm) | 분석 결과를 Schedule로 확정 |
+| Quest | POST | [`/api/v1/quests`](docs/api-reference.md#quest-create) | Quest 생성 |
+| Schedule | POST | [`/api/v1/schedules`](docs/api-reference.md#schedule-create) | 수동/컨펌 Schedule 생성 |
+| Schedule | GET | [`/api/v1/schedules?year=2026&month=8`](docs/api-reference.md#schedule-monthly) | 회원의 월별 Schedule 조회 |
+| Schedule | GET | [`/api/v1/schedules/curations`](docs/api-reference.md#schedule-curations) | D-3 미완료 Schedule 조회 |
+| Schedule | GET | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-get) | Schedule 단건 조회 |
+| Schedule | PATCH | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-update) | Schedule 제목·날짜·시간·장소·메모 수정 |
+| Schedule | PATCH | [`/api/v1/schedules/{scheduleId}/completion`](docs/api-reference.md#schedule-completion) | Schedule 완료 상태 변경 |
+| Schedule | DELETE | [`/api/v1/schedules/{scheduleId}`](docs/api-reference.md#schedule-delete) | Schedule 삭제 |
+
+전체 요청·응답 JSON과 오류 코드는 [API JSON Reference](docs/api-reference.md)에서 확인할 수 있습니다.
+
+## 실행 방법
+
+### 1. 요구사항
+
+- Java 17
+- FastAPI AI 서버: `http://localhost:8000`
+
+### 2. 로컬 설정
+
+JWT 비밀키는 저장소에 커밋하지 않고 환경별 비밀 설정으로 관리합니다. 다음 값이 필요합니다.
+
+```yaml
+jwt:
+  secret: replace-with-at-least-32-byte-secret
+  access-token-expiration: 3600000
+```
+
+AI 서버 주소와 제한 시간은 `application.yml`의 `ai.service`에서 설정합니다.
+
+### 3. Spring 실행
+
+```bash
+cd DoQuest-server
+./gradlew bootRun
+```
+
+로컬 프로필은 H2 In-Memory DB를 사용합니다.
 
 ## 로드맵
 
@@ -456,7 +456,7 @@ AI 후보 자동 표시 → 사용자 확정 → Schedule 생성
 <summary><strong>Revision History</strong></summary>
 
 | 날짜 | 주요 변경 |
-|---|---|
+| --- | --- |
 | 2026.08.08 | Member, Pet, Quest 도메인 구축 |
 | 2026.08.09 | Dashboard Aggregator API 설계 |
 | 2026.08.10 | Quest 30분 수행 가드레일과 Pet 매핑 개선 |
